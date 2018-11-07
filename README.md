@@ -1,6 +1,6 @@
 ---
 services: Azure-Stack
-platforms: go
+platforms: GO
 author: seyadava
 ---
 
