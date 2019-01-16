@@ -12,7 +12,7 @@ The code provided shows how to do the following:
 - Create a resource group
 - Create a virtual network
 - Create a security group
-- Create a poublic IP
+- Create a public IP
 - Create a network interface
 - Create a storage account
 - Create a virtual machine
