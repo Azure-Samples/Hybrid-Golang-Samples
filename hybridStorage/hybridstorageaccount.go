@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"hybridSample/iam"
 	"log"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2017-03-09/storage/mgmt/storage"
+	"../iam"
+
+	"github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/storage/mgmt/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -16,8 +17,8 @@ const (
 	errorPrefix = "Cannot create storage account, reason: %v"
 )
 
-func getStorageAccountsClient(activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID, armEndpoint, subscriptionID string) storage.AccountsClient {
-	token, err := iam.GetResourceManagementTokenHybrid(activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID)
+func getStorageAccountsClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID string) storage.AccountsClient {
+	token, err := iam.GetResourceManagementTokenHybrid(armEndpoint, tenantID, clientID, clientSecret)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
@@ -27,8 +28,8 @@ func getStorageAccountsClient(activeDirectoryEndpoint, tenantID, clientID, clien
 }
 
 // CreateStorageAccount creates a new storage account.
-func CreateStorageAccount(cntx context.Context, accountName, rgName, location, activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID, armEndpoint, subscriptionID string) (s storage.Account, err error) {
-	storageAccountsClient := getStorageAccountsClient(activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID, armEndpoint, subscriptionID)
+func CreateStorageAccount(cntx context.Context, accountName, rgName, location, tenantID, clientID, clientSecret, armEndpoint, subscriptionID string) (s storage.Account, err error) {
+	storageAccountsClient := getStorageAccountsClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID)
 	result, err := storageAccountsClient.CheckNameAvailability(
 		cntx,
 		storage.AccountCheckNameAvailabilityParameters{
@@ -48,7 +49,7 @@ func CreateStorageAccount(cntx context.Context, accountName, rgName, location, a
 		storage.AccountCreateParameters{
 			Sku: &storage.Sku{
 				Name: storage.StandardLRS},
-			Location:                          to.StringPtr(location),
+			Location: to.StringPtr(location),
 			AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{},
 		})
 	if err != nil {

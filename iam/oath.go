@@ -7,6 +7,7 @@ package iam
 
 import (
 	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 const (
@@ -24,14 +25,17 @@ const (
 )
 
 // GetResourceManagementTokenHybrid retrieves auth token for hybrid environment
-func GetResourceManagementTokenHybrid(activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID string) (adal.OAuthTokenProvider, error) {
+func GetResourceManagementTokenHybrid(armEndpoint, tenantID, clientID, clientSecret string) (adal.OAuthTokenProvider, error) {
 	var token adal.OAuthTokenProvider
+	environment, err := azure.EnvironmentFromURL(armEndpoint)
+	tokenAudience := environment.TokenAudience
+	activeDirectoryEndpoint := environment.ActiveDirectoryEndpoint
 	oauthConfig, err := adal.NewOAuthConfig(activeDirectoryEndpoint, tenantID)
 	token, err = adal.NewServicePrincipalToken(
 		*oauthConfig,
 		clientID,
 		clientSecret,
-		activeDirectoryResourceID)
+		tokenAudience)
 
 	return token, err
 }

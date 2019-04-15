@@ -38,15 +38,12 @@ Each operation is clearly labeled with a comment and a print function.
 6.  Fill in and export these environment variables into your current shell. 
 
     ```
-    export ACTIVE_DIRECTORY_ENDPOINT={your active directory endpoint}
-    export ACTIVE_DIRECTORY_RESOURCE_ID={your active directory resource ID}
-    export ARM_ENDPOINT={your AzureStack Resource Manager Endpoint}
-    export AZURE_TENANT_ID={your tenant id}
-    export AZURE_CLIENT_ID={your client id}
-    export AZURE_CLIENT_SECRET={your client secret}
-    export AZURE_SUBSCRIPTION_ID={your subscription id}
-    export AZURE_STORAGE_ENDPOINT_SUFFIX={your storage endpoint suffix}
-    export AZURE_LOCATION={your resource location}
+    export AZ_ARM_ENDPOINT={your AzureStack Resource Manager Endpoint}
+    export AZ_TENANT_ID={your tenant id}
+    export AZ_CLIENT_ID={your client id}
+    export AZ_CLIENT_SECRET={your client secret}
+    export AZ_SUBSCRIPTION_ID={your subscription id}
+    export AZ_LOCATION={your resource location}
     
     ```
 

@@ -4,24 +4,23 @@ import (
 	"context"
 	"fmt"
 
-	hybridresources "hybridSample/hybridResources"
-	hybridstorage "hybridSample/hybridStorage"
-	"hybridSample/hybridcompute"
-	"hybridSample/hybridnetwork"
 	"os"
 	"strings"
+
+	hybridresources "./hybridResources"
+	hybridstorage "./hybridStorage"
+	"./hybridcompute"
+	"./hybridnetwork"
+	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 var (
-	stackActiveDirectoryEndpoint   = os.Getenv("ACTIVE_DIRECTORY_ENDPOINT")
-	stackActiveDirectoryResourceID = os.Getenv("ACTIVE_DIRECTORY_RESOURCE_ID")
-	stackArmEndpoint               = os.Getenv("ARM_ENDPOINT")
-	stackTenantID                  = os.Getenv("AZURE_TENANT_ID")
-	stackClientID                  = os.Getenv("AZURE_CLIENT_ID")
-	stackClientSecret              = os.Getenv("AZURE_CLIENT_SECRET")
-	stackSubscriptionID            = os.Getenv("AZURE_SUBSCRIPTION_ID")
-	stackStorageEndpointSuffix     = os.Getenv("AZURE_STORAGE_ENDPOINT_SUFFIX")
-	stackLocation                  = os.Getenv("AZURE_LOCATION")
+	armEndpoint    = os.Getenv("AZ_ARM_ENDPOINT")
+	tenantID       = os.Getenv("AZ_TENANT_ID")
+	clientID       = os.Getenv("AZ_CLIENT_ID")
+	clientSecret   = os.Getenv("AZ_CLIENT_SECRET")
+	subscriptionID = os.Getenv("AZ_SUBSCRIPTION_ID")
+	location       = os.Getenv("AZ_LOCATION")
 
 	vmName             = "az-samples-go-vmname"
 	nicName            = "nic1"
@@ -33,25 +32,23 @@ var (
 	nsgName            = "nsg1"
 	ipName             = "ip1"
 	storageAccountName = strings.ToLower("samplestacc123")
-	stackRgName        = "stackrg"
+	rgName             = "stackrg"
 )
 
 func main() {
 	cntx := context.Background()
-
+	environment, _ := azure.EnvironmentFromURL(armEndpoint)
+	storageEndpointSuffix := environment.StorageEndpointSuffix
 	//Create a resource group on Azure Stack
 	_, errRgStack := hybridresources.CreateResourceGroup(
 		cntx,
-		stackRgName,
-		"stack",
-		stackLocation,
-		stackActiveDirectoryEndpoint,
-		stackActiveDirectoryResourceID,
-		stackArmEndpoint,
-		stackTenantID,
-		stackClientID,
-		stackClientSecret,
-		stackSubscriptionID)
+		rgName,
+		location,
+		armEndpoint,
+		tenantID,
+		clientID,
+		clientSecret,
+		subscriptionID)
 	if errRgStack != nil {
 		fmt.Println(errRgStack.Error())
 		return
@@ -62,15 +59,13 @@ func main() {
 		cntx,
 		virtualNetworkName,
 		subnetName,
-		stackActiveDirectoryEndpoint,
-		stackTenantID,
-		stackClientID,
-		stackClientSecret,
-		stackActiveDirectoryResourceID,
-		stackArmEndpoint,
-		stackSubscriptionID,
-		stackRgName,
-		stackLocation)
+		tenantID,
+		clientID,
+		clientSecret,
+		armEndpoint,
+		subscriptionID,
+		rgName,
+		location)
 	if errVnet != nil {
 		fmt.Println(errVnet.Error())
 		return
@@ -80,15 +75,13 @@ func main() {
 	_, errSg := hybridnetwork.CreateNetworkSecurityGroup(
 		cntx,
 		nsgName,
-		stackActiveDirectoryEndpoint,
-		stackTenantID,
-		stackClientID,
-		stackClientSecret,
-		stackActiveDirectoryResourceID,
-		stackArmEndpoint,
-		stackSubscriptionID,
-		stackRgName,
-		stackLocation)
+		tenantID,
+		clientID,
+		clientSecret,
+		armEndpoint,
+		subscriptionID,
+		rgName,
+		location)
 	if errSg != nil {
 		fmt.Println(errSg.Error())
 		return
@@ -98,15 +91,13 @@ func main() {
 	_, errIP := hybridnetwork.CreatePublicIP(
 		cntx,
 		ipName,
-		stackActiveDirectoryEndpoint,
-		stackTenantID,
-		stackClientID,
-		stackClientSecret,
-		stackActiveDirectoryResourceID,
-		stackArmEndpoint,
-		stackSubscriptionID,
-		stackRgName,
-		stackLocation)
+		tenantID,
+		clientID,
+		clientSecret,
+		armEndpoint,
+		subscriptionID,
+		rgName,
+		location)
 	if errIP != nil {
 		fmt.Println(errIP.Error())
 	}
@@ -119,15 +110,13 @@ func main() {
 		virtualNetworkName,
 		subnetName,
 		ipName,
-		stackActiveDirectoryEndpoint,
-		stackTenantID,
-		stackClientID,
-		stackClientSecret,
-		stackActiveDirectoryResourceID,
-		stackArmEndpoint,
-		stackSubscriptionID,
-		stackRgName,
-		stackLocation)
+		tenantID,
+		clientID,
+		clientSecret,
+		armEndpoint,
+		subscriptionID,
+		rgName,
+		location)
 	if errNic != nil {
 		fmt.Println(errNic.Error())
 	}
@@ -136,15 +125,13 @@ func main() {
 	_, errSa := hybridstorage.CreateStorageAccount(
 		cntx,
 		storageAccountName,
-		stackRgName,
-		stackLocation,
-		stackActiveDirectoryEndpoint,
-		stackTenantID,
-		stackClientID,
-		stackClientSecret,
-		stackActiveDirectoryResourceID,
-		stackArmEndpoint,
-		stackSubscriptionID)
+		rgName,
+		location,
+		tenantID,
+		clientID,
+		clientSecret,
+		armEndpoint,
+		subscriptionID)
 	if errSa != nil {
 		fmt.Println(errSa.Error())
 	}
@@ -157,16 +144,14 @@ func main() {
 		password,
 		storageAccountName,
 		sshPublicKeyPath,
-		stackRgName,
-		stackLocation,
-		stackActiveDirectoryEndpoint,
-		stackTenantID,
-		stackClientID,
-		stackClientSecret,
-		stackActiveDirectoryResourceID,
-		stackArmEndpoint,
-		stackSubscriptionID,
-		stackStorageEndpointSuffix)
+		rgName,
+		location,
+		tenantID,
+		clientID,
+		clientSecret,
+		armEndpoint,
+		subscriptionID,
+		storageEndpointSuffix)
 	if errVM != nil {
 		fmt.Println(errVM.Error())
 	}

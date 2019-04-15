@@ -8,13 +8,14 @@ package hybridcompute
 import (
 	"context"
 	"fmt"
-	"hybridSample/hybridnetwork"
-	"hybridSample/iam"
 	"io/ioutil"
 	"log"
 	"os"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2017-03-09/compute/mgmt/compute"
+	"../hybridnetwork"
+	"../iam"
+
+	"github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -29,8 +30,8 @@ const (
 // fakepubkey is used if a key isn't available at the specified path in CreateVM(...)
 var fakepubkey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7laRyN4B3YZmVrDEZLZoIuUA72pQ0DpGuZBZWykCofIfCPrFZAJgFvonKGgKJl6FGKIunkZL9Us/mV4ZPkZhBlE7uX83AAf5i9Q8FmKpotzmaxN10/1mcnEE7pFvLoSkwqrQSkrrgSm8zaJ3g91giXSbtqvSIj/vk2f05stYmLfhAwNo3Oh27ugCakCoVeuCrZkvHMaJgcYrIGCuFo6q0Pfk9rsZyriIqEa9AtiUOtViInVYdby7y71wcbl0AbbCZsTSqnSoVxm2tRkOsXV6+8X4SnwcmZbao3H+zfO1GBhQOLxJ4NQbzAa8IJh810rYARNLptgmsd4cYXVOSosTX azureuser"
 
-func getVMClient(activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID, armEndpoint, subscriptionID string) compute.VirtualMachinesClient {
-	token, err := iam.GetResourceManagementTokenHybrid(activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID)
+func getVMClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID string) compute.VirtualMachinesClient {
+	token, err := iam.GetResourceManagementTokenHybrid(armEndpoint, tenantID, clientID, clientSecret)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
@@ -41,9 +42,9 @@ func getVMClient(activeDirectoryEndpoint, tenantID, clientID, clientSecret, acti
 
 // CreateVM creates a new virtual machine with the specified name using the specified network interface and storage account.
 // Username, password, and sshPublicKeyPath determine logon credentials.
-func CreateVM(ctx context.Context, vmName, nicName, username, password, storageAccountName, sshPublicKeyPath, rgName, location, activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID, armEndpoint, subscriptionID, storageEndpointSuffix string) (vm compute.VirtualMachine, err error) {
+func CreateVM(ctx context.Context, vmName, nicName, username, password, storageAccountName, sshPublicKeyPath, rgName, location, tenantID, clientID, clientSecret, armEndpoint, subscriptionID, storageEndpointSuffix string) (vm compute.VirtualMachine, err error) {
 	cntx := context.Background()
-	nic, _ := hybridnetwork.GetNic(cntx, nicName, activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID, armEndpoint, subscriptionID, rgName)
+	nic, _ := hybridnetwork.GetNic(cntx, nicName, tenantID, clientID, clientSecret, armEndpoint, subscriptionID, rgName)
 
 	var sshKeyData string
 	_, err = os.Stat(sshPublicKeyPath)
@@ -57,7 +58,7 @@ func CreateVM(ctx context.Context, vmName, nicName, username, password, storageA
 		sshKeyData = fakepubkey
 	}
 	vhdURItemplate := "https://%s.blob." + storageEndpointSuffix + "/vhds/%s.vhd"
-	vmClient := getVMClient(activeDirectoryEndpoint, tenantID, clientID, clientSecret, activeDirectoryResourceID, armEndpoint, subscriptionID)
+	vmClient := getVMClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID)
 	hardwareProfile := &compute.HardwareProfile{
 		VMSize: compute.StandardA1,
 	}
@@ -73,7 +74,7 @@ func CreateVM(ctx context.Context, vmName, nicName, username, password, storageA
 			Vhd: &compute.VirtualHardDisk{
 				URI: to.StringPtr(fmt.Sprintf(vhdURItemplate, storageAccountName, vmName)),
 			},
-			CreateOption: compute.FromImage,
+			CreateOption: compute.DiskCreateOptionTypesFromImage,
 		},
 	}
 	osProfile := &compute.OSProfile{
