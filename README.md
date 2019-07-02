@@ -1,4 +1,9 @@
 ---
+topic: sample
+languages:
+ - go
+products:
+ - azure-sdks
 services: Azure-Stack
 platforms: GO
 author: seyadava
