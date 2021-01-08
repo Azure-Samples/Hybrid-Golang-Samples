@@ -37,29 +37,53 @@ Each operation is clearly labeled with a comment and a print function.
     git clone https://github.com/Azure-Samples/Hybrid-Compute-Go-Create-VM.git
     ```
 
-4.  Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
+4.  Move the Hybrid-Compute-Go-Create-VM folder to your $GOPATH/src folder.
 
-6.  Fill in and export these environment variables into your current shell. 
+5.  Open a Powershell or Bash shell in $GOPATH/src/Hybrid-Compute-Go-Create-VM and enter the following command:
 
     ```
-    export AZ_ARM_ENDPOINT={your AzureStack Resource Manager Endpoint}
-    export AZ_TENANT_ID={your tenant id}
-    export AZ_CLIENT_ID={your client id}
-    export AZ_CLIENT_SECRET={your client secret}
-    export AZ_SUBSCRIPTION_ID={your subscription id}
-    export AZ_LOCATION={your resource location}
+    go mod init Hybrid-Compute-Go-Create-VM
+    ```
+
+6.  Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
+
+7.  Fill in and export these environment variables into your current shell. 
+
+    ```
+    export AZS_ARM_ENDPOINT={your AzureStack Resource Manager Endpoint}
+    export AZS_TENANT_ID={your tenant id}
+    export AZS_SECRET_CLIENT_ID={your service principal client id that came with your service principal client secret}
+    export AZS_CLIENT_SECRET={your service principal client secret}
+    export AZS_SUBSCRIPTION_ID={your subscription id}
+    export AZS_LOCATION={your resource location}
     
     ```
 
-7.  Note that in order to run this sample, WindowsServer 2012-R2-Datacenter image must be present in AzureStack market place. These can be either [downloaded from Azure](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-download-azure-marketplace-item) or [added to Platform Image Repository](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-add-vm-image).
+8.  Note that in order to run this sample, Canonial UbuntuServer 16.04-LTS image must be present in AzureStack market place. These can be either [downloaded from Azure](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-download-azure-marketplace-item) or [added to Platform Image Repository](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-add-vm-image).
 
 
-8. Run the sample.
+9.  Run the sample.
 
     ```
     go run app.go
     ```
     
+10. To clean up resources, sign into the Service Principal used to create the resource group "stackrg" (assigned in app.go) and remove the resource group:
+
+    ```
+    $clientIdForSecret = "<Client Id associated with a client secret>"
+    $clientSecret = "<Client secret>"
+    $tenantId = "<The tenant Id>"
+    $servicePrincipalSecurePassword = $clientSecret | ConvertTo-SecureString -AsPlaintText -Force
+    $servicePrincipalCredential = New-Object -TypeName System.Management.Automation.PSCredential `
+        -ArgumentList $clientIdForSecret $servicePrincipalSecurePassword
+    Connect-AzAccount -Environment $ServiceAdminEnvironmentName `
+        -ServicePrincipal `
+        -Credential $servicePrincipalCredential `
+        -TenantId $tenantID
+    Remove-AzResourceGroup -Name "stackrg"
+    ```
+
 ## More information
 
 Here are some helpful links:
