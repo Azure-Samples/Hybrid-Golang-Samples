@@ -27,39 +27,57 @@ Each operation is clearly labeled with a comment and a print function.
 
 
 ## Running this sample
-1.  If you don't already have it, [install Golang](https://golang.org/doc/install).
 
-2.  Install Go SDK and its dependencies, [install Go SDK](https://github.com/azure/azure-sdk-for-go) 
+1. If you don't already have it, [install Golang](https://golang.org/doc/install).
 
-3.  Clone the repository.
+1. Install Go SDK and its dependencies, [install Go SDK](https://github.com/azure/azure-sdk-for-go) 
 
+1. Clone the sample project repository to your `GOPATH` location. You can add a new path to `GOPATH` location by adding an existing folder path to the `GOPATH` user environment variable. 
+    - Create a `src` folder inside this new `GOPATH` folder and `cd` into the `src` folder.
     ```
-    git clone https://github.com/Azure-Samples/Hybrid-Compute-Go-Create-VM.git
+    mkdir src
+    cd src
     ```
-
-4.  Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
-
-6.  Fill in and export these environment variables into your current shell. 
-
+    - Clone the sample project repository into your `src` folder.
     ```
-    export AZ_ARM_ENDPOINT={your AzureStack Resource Manager Endpoint}
-    export AZ_TENANT_ID={your tenant id}
-    export AZ_CLIENT_ID={your client id}
-    export AZ_CLIENT_SECRET={your client secret}
-    export AZ_SUBSCRIPTION_ID={your subscription id}
-    export AZ_LOCATION={your resource location}
-    
+    git clone https://github.com/Azure-Samples/Hybrid-Compute-Go-ManagedDisks.git
     ```
 
-7.  Note that in order to run this sample, WindowsServer 2012-R2-Datacenter image must be present in AzureStack market place. These can be either [downloaded from Azure](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-download-azure-marketplace-item) or [added to Platform Image Repository](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-add-vm-image).
+1. Open a Powershell or Bash shell in `$GOPATH/src/Hybrid-Compute-Go-Create-VM` and enter the following command:
+    ```
+    go mod init Hybrid-Compute-Go-Create-VM
+    ```
 
+1. Run the following to validate the go mod file with the required source code modules.
+    ```
+    go mod tidy
+    ```
 
-8. Run the sample.
+1. Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
 
+1. Fill in and export these environment variables into your current shell. 
+    ```
+    export AZURE_ARM_ENDPOINT={your AzureStack Resource Manager Endpoint}
+    export AZURE_TENANT_ID={your tenant id for AAD or "adfs" for ADFS}
+    export AZURE_SP_APP_ID={your service principal client id that came with your service principal client secret}
+    export AZURE_SP_APP_SECRET ={your service principal client secret}
+    export AZURE_SUBSCRIPTION_ID={your subscription id}
+    export AZURE_LOCATION={your resource location}
+    ```
+
+1. Note that in order to run this sample, Canonial UbuntuServer 16.04-LTS image must be present in AzureStack market place. These can be [downloaded from Azure](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-download-azure-marketplace-item) and [added to Platform Image Repository](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-add-vm-image).
+
+1. Azure will force the use of SSH over password authentication if both were configured. The sample code also enforces SSH key pair authentication over password authentication. The password authentication will be used if the SSH key pair path does not exist. To run the sample, do one of either:
+    - Create an SSH key at `%HOMEPATH%/.ssh/id_rsa.pub` for SSH key pair authentication.
     ```
     go run app.go
     ```
-    
+    - Pass a string parameter as the VM admin password for password authentication.
+    ```
+    go run app.go <PASSWORD>
+    ```
+
+
 ## More information
 
 Here are some helpful links:

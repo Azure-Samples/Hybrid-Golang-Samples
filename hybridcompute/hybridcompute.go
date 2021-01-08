@@ -12,10 +12,10 @@ import (
 	"log"
 	"os"
 
-	"../hybridnetwork"
-	"../iam"
+	"Hybrid-Compute-Go-Create-VM/hybridnetwork"
+	"Hybrid-Compute-Go-Create-VM/iam"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/compute/mgmt/compute"
+	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -54,9 +54,8 @@ func CreateVM(ctx context.Context, vmName, nicName, username, password, storageA
 			log.Fatalf(fmt.Sprintf(errorPrefix, fmt.Sprintf("failed to read SSH key data: %v", err)))
 		}
 		sshKeyData = string(sshBytes)
-	} else {
-		sshKeyData = fakepubkey
 	}
+
 	vhdURItemplate := "https://%s.blob." + storageEndpointSuffix + "/vhds/%s.vhd"
 	vmClient := getVMClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID)
 	hardwareProfile := &compute.HardwareProfile{
@@ -77,20 +76,32 @@ func CreateVM(ctx context.Context, vmName, nicName, username, password, storageA
 			CreateOption: compute.DiskCreateOptionTypesFromImage,
 		},
 	}
-	osProfile := &compute.OSProfile{
-		ComputerName:  to.StringPtr(vmName),
-		AdminUsername: to.StringPtr(username),
-		AdminPassword: to.StringPtr(password),
-		LinuxConfiguration: &compute.LinuxConfiguration{
-			SSH: &compute.SSHConfiguration{
-				PublicKeys: &[]compute.SSHPublicKey{
-					{
-						Path:    to.StringPtr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", username)),
-						KeyData: to.StringPtr(sshKeyData),
+	var osProfile *compute.OSProfile
+	if len(username) != 0 && len(sshKeyData) != 0 {
+		osProfile = &compute.OSProfile{
+			ComputerName:  to.StringPtr(vmName),
+			AdminUsername: to.StringPtr(username),
+			LinuxConfiguration: &compute.LinuxConfiguration{
+				SSH: &compute.SSHConfiguration{
+					PublicKeys: &[]compute.SSHPublicKey{
+						{
+							Path:    to.StringPtr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", username)),
+							KeyData: to.StringPtr(sshKeyData),
+						},
 					},
 				},
 			},
-		},
+		}
+	} else if len(username) != 0 && len(password) != 0 {
+		osProfile = &compute.OSProfile{
+			ComputerName:  to.StringPtr(vmName),
+			AdminUsername: to.StringPtr(username),
+			AdminPassword: to.StringPtr(password),
+		}
+	} else if len(sshKeyData) == 0 && len(password) == 0 {
+		log.Fatalf(fmt.Sprintf(errorPrefix, fmt.Sprintf("Both VM admin password and SSH key pair path %s are invalid. At least one required to create VM. Usage for password authentication: go run app.go <PASSWORD>", sshPublicKeyPath)))
+	} else {
+		log.Fatalf(fmt.Sprintf(errorPrefix, fmt.Sprintf("VM admin username is an empty string.")))
 	}
 	networkProfile := &compute.NetworkProfile{
 		NetworkInterfaces: &[]compute.NetworkInterfaceReference{
@@ -120,7 +131,7 @@ func CreateVM(ctx context.Context, vmName, nicName, username, password, storageA
 	if err != nil {
 		return vm, fmt.Errorf(fmt.Sprintf(errorPrefix, err))
 	}
-	err = future.WaitForCompletion(cntx, vmClient.Client)
+	err = future.WaitForCompletionRef(cntx, vmClient.Client)
 	if err != nil {
 		return vm, fmt.Errorf(fmt.Sprintf(errorPrefix, err))
 	}

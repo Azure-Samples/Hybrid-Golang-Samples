@@ -3,12 +3,11 @@ package hybridresources
 import (
 	"context"
 	"fmt"
-
 	"log"
 
-	"../iam"
+	"Hybrid-Compute-Go-Create-VM/iam"
 
-	azurestack "github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/resources/mgmt/resources"
+	azurestack "github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources"
 	"github.com/Azure/go-autorest/autorest"
 )
 
