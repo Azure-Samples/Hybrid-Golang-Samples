@@ -3,12 +3,11 @@ package hybridStorage
 import (
 	"context"
 	"fmt"
-
 	"log"
 
-	"../iam"
+	"Hybrid-Compute-Go-Create-VM/iam"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/storage/mgmt/storage"
+	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/storage/mgmt/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -49,13 +48,13 @@ func CreateStorageAccount(cntx context.Context, accountName, rgName, location, t
 		storage.AccountCreateParameters{
 			Sku: &storage.Sku{
 				Name: storage.StandardLRS},
-			Location: to.StringPtr(location),
+			Location:                          to.StringPtr(location),
 			AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{},
 		})
 	if err != nil {
 		return s, fmt.Errorf(fmt.Sprintf(errorPrefix, err))
 	}
-	err = future.WaitForCompletion(cntx, storageAccountsClient.Client)
+	err = future.WaitForCompletionRef(cntx, storageAccountsClient.Client)
 	if err != nil {
 		return s, fmt.Errorf(fmt.Sprintf(errorPrefix, fmt.Sprintf("cannot get the storage account create future response: %v", err)))
 	}
