@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"Hybrid-Compute-Go-Create-VM/iam"
+	"vm/iam"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/storage/mgmt/storage"
 	"github.com/Azure/go-autorest/autorest"

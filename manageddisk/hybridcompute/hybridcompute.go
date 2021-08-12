@@ -12,8 +12,8 @@ import (
 	"log"
 	"os"
 
-	"Hybrid-Compute-Go-Create-VM/hybridnetwork"
-	"Hybrid-Compute-Go-Create-VM/iam"
+	"manageddisk/hybridnetwork"
+	"manageddisk/iam"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest"
@@ -27,11 +27,8 @@ const (
 	errorPrefix = "Cannot create VM, reason: %v"
 )
 
-// fakepubkey is used if a key isn't available at the specified path in CreateVM(...)
-var fakepubkey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7laRyN4B3YZmVrDEZLZoIuUA72pQ0DpGuZBZWykCofIfCPrFZAJgFvonKGgKJl6FGKIunkZL9Us/mV4ZPkZhBlE7uX83AAf5i9Q8FmKpotzmaxN10/1mcnEE7pFvLoSkwqrQSkrrgSm8zaJ3g91giXSbtqvSIj/vk2f05stYmLfhAwNo3Oh27ugCakCoVeuCrZkvHMaJgcYrIGCuFo6q0Pfk9rsZyriIqEa9AtiUOtViInVYdby7y71wcbl0AbbCZsTSqnSoVxm2tRkOsXV6+8X4SnwcmZbao3H+zfO1GBhQOLxJ4NQbzAa8IJh810rYARNLptgmsd4cYXVOSosTX azureuser"
-
-func getVMClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID string) compute.VirtualMachinesClient {
-	token, err := iam.GetResourceManagementTokenHybrid(armEndpoint, tenantID, clientID, clientSecret)
+func getVMClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID string) compute.VirtualMachinesClient {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
@@ -40,11 +37,21 @@ func getVMClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID s
 	return vmClient
 }
 
+func getDiskClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID string) compute.DisksClient {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
+	if err != nil {
+		log.Fatal(fmt.Sprintf(errorPrefix, fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
+	}
+	diskClient := compute.NewDisksClientWithBaseURI(armEndpoint, subscriptionID)
+	diskClient.Authorizer = autorest.NewBearerAuthorizer(token)
+	return diskClient
+}
+
 // CreateVM creates a new virtual machine with the specified name using the specified network interface and storage account.
 // Username, password, and sshPublicKeyPath determine logon credentials.
-func CreateVM(ctx context.Context, vmName, nicName, username, password, storageAccountName, sshPublicKeyPath, rgName, location, tenantID, clientID, clientSecret, armEndpoint, subscriptionID, storageEndpointSuffix string) (vm compute.VirtualMachine, err error) {
+func CreateVM(ctx context.Context, vmName, diskName, nicName, username, password, storageAccountName, sshPublicKeyPath, rgName, location, tenantID, clientID, certPass, certPath, armEndpoint, subscriptionID string) (vm compute.VirtualMachine, err error) {
 	cntx := context.Background()
-	nic, _ := hybridnetwork.GetNic(cntx, nicName, tenantID, clientID, clientSecret, armEndpoint, subscriptionID, rgName)
+	nic, _ := hybridnetwork.GetNic(cntx, nicName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName)
 
 	var sshKeyData string
 	_, err = os.Stat(sshPublicKeyPath)
@@ -56,8 +63,22 @@ func CreateVM(ctx context.Context, vmName, nicName, username, password, storageA
 		sshKeyData = string(sshBytes)
 	}
 
-	vhdURItemplate := "https://%s.blob." + storageEndpointSuffix + "/vhds/%s.vhd"
-	vmClient := getVMClient(tenantID, clientID, clientSecret, armEndpoint, subscriptionID)
+	vmClient := getVMClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
+	diskClient := getDiskClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
+	diskFuture, _ := diskClient.CreateOrUpdate(ctx, rgName, diskName, compute.Disk{
+		Location: to.StringPtr(location),
+		DiskProperties: &compute.DiskProperties{
+			CreationData: &compute.CreationData{
+				CreateOption: compute.Empty,
+			},
+			DiskSizeGB: to.Int32Ptr(1),
+		},
+	})
+	err = diskFuture.WaitForCompletionRef(ctx, diskClient.Client)
+	if err != nil {
+		return vm, err
+	}
+	disk, _ := diskFuture.Result(diskClient)
 	hardwareProfile := &compute.HardwareProfile{
 		VMSize: compute.StandardA1,
 	}
@@ -68,11 +89,21 @@ func CreateVM(ctx context.Context, vmName, nicName, username, password, storageA
 			Sku:       to.StringPtr(sku),
 			Version:   to.StringPtr("latest"),
 		},
-		OsDisk: &compute.OSDisk{
-			Name: to.StringPtr("osDisk"),
-			Vhd: &compute.VirtualHardDisk{
-				URI: to.StringPtr(fmt.Sprintf(vhdURItemplate, storageAccountName, vmName)),
+		DataDisks: &[]compute.DataDisk{
+			{
+				CreateOption: compute.DiskCreateOptionTypesAttach,
+				ManagedDisk: &compute.ManagedDiskParameters{
+					StorageAccountType: compute.StorageAccountTypesStandardLRS,
+					ID:                 disk.ID,
+				},
+				Caching:    compute.CachingTypesReadOnly,
+				DiskSizeGB: to.Int32Ptr(1),
+				Lun:        to.Int32Ptr(1),
+				Name:       to.StringPtr(diskName),
 			},
+		},
+		OsDisk: &compute.OSDisk{
+			Name:         to.StringPtr("osDisk"),
 			CreateOption: compute.DiskCreateOptionTypesFromImage,
 		},
 	}

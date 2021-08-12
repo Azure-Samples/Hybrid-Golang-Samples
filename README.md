@@ -1,92 +1,96 @@
 ---
 page_type: sample
-languages:
+Languages: 
 - go
-products:
-- azure
-description: "These samples demonstrate how to create Virtual Machines using the Azure SDK for Go on Azure Stack."
-urlFragment: Hybrid-Compute-Go-Create-VM
+Products: 
+- azure-sdks
+description: "These samples demonstrate various interaction with Azure Stack Hub."
+urlFragment: Hybrid-Golang-Samples
 ---
 
-# Hybrid-Compute-GO-Create-VM
+# Official Microsoft Sample
 
-These samples demonstrate how to create Virtual Machines using the Azure SDK for Go on Azure Stack.
-The code provided shows how to do the following:
+<!-- 
+Guidelines on README format: https://review.docs.microsoft.com/help/onboard/admin/samples/concepts/readme-template?branch=master
 
-- Create a resource group
-- Create a virtual network
-- Create a security group
-- Create a public IP
-- Create a network interface
-- Create a storage account
-- Create a virtual machine
+Guidance on onboarding samples to docs.microsoft.com/samples: https://review.docs.microsoft.com/help/onboard/admin/samples/process/onboarding?branch=master
 
-To see the code to perform these operations,
-check out the `main()` function in [app.go](app.go).
-Each operation is clearly labeled with a comment and a print function.
+Taxonomies for products and languages: https://review.docs.microsoft.com/new-hope/information-architecture/metadata/taxonomies?branch=master
+-->
 
+This repository is for Azure Stack Hub JavaScript samples. Each of the sub-directories contain README.md files detailing how to that sample.
 
-## Running this sample
+If you don't already have it, [install Golang](https://golang.org/doc/install).
 
-1. If you don't already have it, [install Golang](https://golang.org/doc/install).
+## Create Service Principal
+Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription. The samples use either a secret or certificate service principal.
 
-1. Install Go SDK and its dependencies, [install Go SDK](https://github.com/azure/azure-sdk-for-go) 
+## Configure Service Principal Details
+Some of the configuration parameters from service principal objects may not be used in the samples. The configuration file includes them anyway for thoroughness and future-proofing.
 
-1. Clone the sample project repository to your `GOPATH` location. You can add a new path to `GOPATH` location by adding an existing folder path to the `GOPATH` user environment variable. 
-    - Create a `src` folder inside this new `GOPATH` folder and `cd` into the `src` folder.
-    ```
-    mkdir src
-    cd src
-    ```
-    - Clone the sample project repository into your `src` folder.
-    ```
-    git clone https://github.com/Azure-Samples/Hybrid-Compute-Go-ManagedDisks.git
-    ```
+### Setup Secret Service Principal
 
-1. Open a Powershell or Bash shell in `$GOPATH/src/Hybrid-Compute-Go-Create-VM` and enter the following command:
-    ```
-    go mod init Hybrid-Compute-Go-Create-VM
-    ```
+Set the following JSON properties in `./azureAppSpConfig.json`.
 
-1. Run the following to validate the go mod file with the required source code modules.
-    ```
-    go mod tidy
-    ```
+| Variable              | Description                                                 |
+|-----------------------|-------------------------------------------------------------|
+| `clientId`            | Service principal application id.                            |
+| `clientSecret`        | Service principal application secret.                        |
+| `clientObjectId`      | Service principal object id.                                 |
+| `tenantId`            | Azure Stack Hub tenant id.                                   |
+| `subscriptionId`      | Subscription id used to access offers in Azure Stack Hub.    |
+| `resourceManagerUrl`  | Azure Stack Hub Resource Manager Endpoint.                   |
+| `location`            | Azure Resource location.                                     |
 
-1. Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals) to work against AzureStack. Make sure your service principal has [contributor/owner role](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-create-service-principals#assign-role-to-service-principal) on your subscription.
+### Setup Certificate Service Principal 
 
-1. Fill in and export these environment variables into your current shell. 
-    ```
-    export AZURE_ARM_ENDPOINT={your AzureStack Resource Manager Endpoint}
-    export AZURE_TENANT_ID={your tenant id for AAD or "adfs" for ADFS}
-    export AZURE_SP_APP_ID={your service principal client id that came with your service principal client secret}
-    export AZURE_SP_APP_SECRET ={your service principal client secret}
-    export AZURE_SUBSCRIPTION_ID={your subscription id}
-    export AZURE_LOCATION={your resource location}
-    ```
+The certificate service principal will be similar in output to secret service principal, except it uses `azureCertSpConfig.json` config file.
 
-1. Note that in order to run this sample, Canonial UbuntuServer 16.04-LTS image must be present in AzureStack market place. These can be [downloaded from Azure](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-download-azure-marketplace-item) and [added to Platform Image Repository](https://docs.microsoft.com/en-us/azure/azure-stack/azure-stack-add-vm-image).
+| Variable              | Description                                                 |
+|-----------------------|-------------------------------------------------------------|
+| `clientId`            | Service principal application id.                            |
+| `certPass`            | Certificate password                                        |
+| `certPath`            | "/" separated path to the certificate.                      |
+| `clientObjectId`      | Service principal object id.                                 |
+| `tenantId`            | Azure Stack Hub tenant id.                                   |
+| `subscriptionId`      | Subscription id used to access offers in Azure Stack Hub.    |
+| `resourceManagerUrl`  | Azure Stack Hub Resource Manager Endpoint.                   |
+| `location`            | Azure Resource location.                                     |
 
-1. Azure will force the use of SSH over password authentication if both were configured. The sample code also enforces SSH key pair authentication over password authentication. The password authentication will be used if the SSH key pair path does not exist. To run the sample, do one of either:
-    - Create an SSH key at `%HOMEPATH%/.ssh/id_rsa.pub` for SSH key pair authentication.
-    ```
-    go run app.go
-    ```
-    - Pass a string parameter as the VM admin password for password authentication.
-    ```
-    go run app.go <PASSWORD>
-    ```
+Service principal PowerShell object output example for secret service principal:
 
+AAD
+```
+Secret                : System.Security.SecureString                                 # clientSecret  (decrypt for external use)
+ServicePrincipalNames : {bd6bb75f-5fd6-4db9-91b7-4a6941e7feb9, http://azs-sptest01}
+ApplicationId         : bd6bb75f-5fd6-4db9-91b7-4a6941e7feb9                         # clientId
+DisplayName           : azs-sptest01
+Id                    : 36a22ee4-e2b0-411d-8f21-0ea8b4b5c46f                         # clientObjectId
+AdfsId                : 
+Type                  : ServicePrincipal
+```
 
-## More information
+ADFS
+```
+ApplicationIdentifier : S-1-5-21-2937821301-3551617933-4294865508-76632              # clientObjectId
+ClientId              : 7591924e-0341-4812-8d23-52ef0aa27eff                         # clientId
+Thumbprint            : 
+ApplicationName       : Azurestack-azs-sptest01
+ClientSecret          : <Redacted>                                                   # clientSecret
+PSComputerName        : <Redacted>
+RunspaceId            : e841cbbc-3d8e-45fd-b63f-42adbfbf664b
+```
 
-Here are some helpful links:
+## Contributing
 
-- [Azure Virtual Machines documentation](https://azure.microsoft.com/services/virtual-machines/)
-- [Learning Path for Virtual Machines](https://azure.microsoft.com/documentation/learning-paths/virtual-machines/)
+This project welcomes contributions and suggestions.  Most contributions require you to agree to a
+Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
+the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
 
-If you don't have a Microsoft Azure subscription you can get a FREE trial account [here](http://go.microsoft.com/fwlink/?LinkId=330212).
+When you submit a pull request, a CLA bot will automatically determine whether you need to provide
+a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
+provided by the bot. You will only need to do this once across all repos using our CLA.
 
----
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
+contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
