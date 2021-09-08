@@ -1,14 +1,14 @@
 ---
 page_type: sample
-Languages: 
+languages: 
 - go
-Products: 
+products: 
 - azure-sdks
 description: "These samples demonstrate various interaction with Azure Stack Hub."
 urlFragment: Hybrid-Golang-Samples
 ---
 
-# Official Microsoft Sample
+# Hybrid-Golang-Samples
 
 <!-- 
 Guidelines on README format: https://review.docs.microsoft.com/help/onboard/admin/samples/concepts/readme-template?branch=master
