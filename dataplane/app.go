@@ -74,7 +74,7 @@ func main() {
 			config.CertPass,
 			config.SubscriptionId)
 		if err != nil {
-			fmt.Printf(err.Error())
+			log.Fatal(err.Error())
 		} else {
 			fmt.Printf("Successfully deleted resource group '%s'.\n", resourceGroupName)
 		}
@@ -94,8 +94,7 @@ func main() {
 		config.CertPass,
 		config.SubscriptionId)
 	if errRgStack != nil {
-		fmt.Printf(errRgStack.Error())
-		return
+		log.Fatal(errRgStack.Error())
 	} else {
 		fmt.Printf("Successfully created resource group '%s'.\n", resourceGroupName)
 	}
@@ -110,8 +109,7 @@ func main() {
 		config.CertPath,
 		config.SubscriptionId)
 	if &storageAccountClient == nil {
-		fmt.Printf("Failed to get storage account client.\n")
-		return
+		log.Fatal("Failed to get storage account client.\n")
 	} else {
 		fmt.Printf("Successfully got storage account client.\n")
 	}
@@ -125,8 +123,7 @@ func main() {
 		resourceGroupName,
 		config.Location)
 	if errSa != nil {
-		fmt.Printf(errSa.Error())
-		return
+		log.Fatal(errSa.Error())
 	} else {
 		fmt.Printf("Successfully created storage account %s.\n", storageAccountName)
 	}
@@ -140,8 +137,7 @@ func main() {
 		resourceGroupName,
 		storageContainerName)
 	if errDP != nil {
-		fmt.Printf(errDP.Error())
-		return
+		log.Fatal(errDP.Error())
 	} else {
 		fmt.Printf("Successfully got dataplane URL.\n")
 	}
@@ -157,8 +153,7 @@ func main() {
 		dataplaneURL,
 		blobFileAddress)
 	if uploadErr != nil {
-		fmt.Printf(uploadErr.Error())
-		return
+		log.Fatal(uploadErr.Error())
 	} else {
 		fmt.Printf("Successfully uploaded '%s' to storage container...\n", blobFileAddress)
 		fmt.Printf("Sample completed successfully.\n")
