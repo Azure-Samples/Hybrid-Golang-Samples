@@ -99,7 +99,7 @@ func main() {
 			config.ClientSecret,
 			config.SubscriptionId)
 		if err != nil {
-			fmt.Printf(err.Error())
+			log.Fatal(err.Error())
 		} else {
 			fmt.Printf("Successfully deleted resource group '%s'.\n", resourceGroupName)
 		}
@@ -118,8 +118,7 @@ func main() {
 		config.ClientSecret,
 		config.SubscriptionId)
 	if errRgStack != nil {
-		fmt.Printf(errRgStack.Error())
-		return
+		log.Fatal(errRgStack.Error())
 	} else {
 		fmt.Printf("Successfully created resource group '%s'.\n", resourceGroupName)
 	}
@@ -138,8 +137,7 @@ func main() {
 		resourceGroupName,
 		config.Location)
 	if errVnet != nil {
-		fmt.Printf(errVnet.Error())
-		return
+		log.Fatal(errVnet.Error())
 	} else {
 		fmt.Printf("Successfully created virtual network '%s' and subnet '%s'.\n", virtualNetworkName, subnetName)
 	}
@@ -157,8 +155,7 @@ func main() {
 		resourceGroupName,
 		config.Location)
 	if errSg != nil {
-		fmt.Printf(errSg.Error())
-		return
+		log.Fatal(errSg.Error())
 	} else {
 		fmt.Printf("Successfully created network security group '%s'.\n", nsgName)
 	}
@@ -176,8 +173,7 @@ func main() {
 		resourceGroupName,
 		config.Location)
 	if errIP != nil {
-		fmt.Printf(errIP.Error())
-		return
+		log.Fatal(errIP.Error())
 	} else {
 		fmt.Printf("Successfully created public ip '%s'.\n", ipName)
 	}
@@ -199,8 +195,7 @@ func main() {
 		resourceGroupName,
 		config.Location)
 	if errNic != nil {
-		fmt.Printf(errNic.Error())
-		return
+		log.Fatal(errNic.Error())
 	} else {
 		fmt.Printf("Successfully created network interface '%s'.\n", nicName)
 	}
@@ -218,8 +213,7 @@ func main() {
 		config.ResourceManagerUrl,
 		config.SubscriptionId)
 	if errSa != nil {
-		fmt.Printf(errSa.Error())
-		return
+		log.Fatal(errSa.Error())
 	} else {
 		fmt.Printf("Successfully created storage account '%s'.\n", storageAccountName)
 	}
@@ -242,7 +236,7 @@ func main() {
 		config.SubscriptionId,
 		storageEndpointSuffix)
 	if errVM != nil {
-		fmt.Printf(errVM.Error())
+		log.Fatal(errVM.Error())
 	} else {
 		fmt.Printf("Successfully created vm '%s'.\n", vmName)
 		fmt.Printf("Sample completed successfully.\n")
