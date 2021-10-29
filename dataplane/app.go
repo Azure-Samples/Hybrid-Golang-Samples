@@ -18,7 +18,7 @@ import (
 
 var (
 	storageAccountName   = "samplestacc"
-	resourceGroupName    = "azure-sample-rg"
+	resourceGroupName    = "azure-sample-golang-dataplane"
 	storageContainerName = "samplecontainer"
 )
 
