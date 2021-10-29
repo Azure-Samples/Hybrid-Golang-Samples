@@ -27,7 +27,7 @@ var (
 	nsgName            = "nsg1"
 	ipName             = "ip1"
 	storageAccountName = strings.ToLower("samplestacc")
-	resourceGroupName  = "azure-sample-rg"
+	resourceGroupName  = "azure-sample-golang-manageddisk"
 	diskName           = "sampledisk"
 )
 
