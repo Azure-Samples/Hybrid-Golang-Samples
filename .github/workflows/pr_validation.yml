@@ -1,0 +1,161 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: 'Comma Separated List. Specify branch with "java:myBranch". Defaults to master branch. Specify select sample folders with "java:[vm]" or "java:myBranch:[vm;storage]". Defaults to run all samples. E.g., "javascript golang:branch1:[resourcegroup] csharp:[vm;storage] java:branch2 python:[vm] ruby"'
+        required: true
+        default: 'golang'
+      environment_name:
+        description: 'Select an environment name from configuration JSON file under "environments".'
+        required: true
+        default: 'longhaul5'
+
+jobs:
+  Prepare_CI:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout ${{ github.repository }}.
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Resolve environment-dependent values.
+        id: environment_resolution_step
+        shell: pwsh
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          $config = Import-ConfigFile
+
+          if ("${{ github.event.inputs.environment_name }}")
+          {
+            $environmentName = "${{ github.event.inputs.environment_name }}"
+            $environmentJsonArray = "[`"${environmentName}`"]"
+          }
+          else
+          {
+            $aadIndex = Get-Random -Maximum $config.environmentPools.aad.Count
+            $adfsIndex = Get-Random -Maximum $config.environmentPools.adfs.Count
+
+            $aadEnvironmentName = $config.environmentPools.aad[$aadIndex]
+            $adfsEnvironmentName = $config.environmentPools.adfs[$adfsIndex]
+            $environmentJsonArray = "[`"${aadEnvironmentName}`",`"${adfsEnvironmentName}`"]"
+          }
+
+          $azureStackAadSecretSp = "$($aadEnvironmentName.ToUpper())_SECRET_SP"
+          $azureStackAadCertSp = "$($aadEnvironmentName.ToUpper())_CERT_SP"
+          $azureStackAdfsSecretSp = "$($adfsEnvironmentName.ToUpper())_SECRET_SP"
+          $azureStackAdfsCertSp = "$($adfsEnvironmentName.ToUpper())_CERT_SP"
+
+          echo "::set-output name=AZURESTACK_AAD_SECRET_SP_NAME::${azureStackAadSecretSp}"
+          echo "::set-output name=AZURESTACK_AAD_CERT_SP_NAME::${azureStackAadCertSp}"
+          echo "::set-output name=AZURESTACK_ADFS_SECRET_SP_NAME::${azureStackAdfsSecretSp}"
+          echo "::set-output name=AZURESTACK_ADFS_CERT_SP_NAME::${azureStackAdfsCertSp}"
+          echo "::set-output name=ENVIRONMENT_JSON_ARRAY::${environmentJsonArray}"
+
+      - name: Log in with Azure.
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_SP_CREDENTIALS }}
+          enable-AzPSSession: true
+
+      - name: Convert input to JSON for matrix.
+        id: matrix_json_step
+        shell: pwsh
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          if ("${{ github.event.inputs.samples }}")
+          {
+            $resolvedInputSet =  Resolve-Input -Samples "${{ github.event.inputs.samples }}"
+          }
+          else
+          {
+            $resolvedInputSet =  Resolve-Input -Samples "golang"
+          }
+          $inputJsonArrayString = ($resolvedInputSet | ForEach-Object {"`"${_}`""}) -join ","
+          $inputJsonArrayString = "[${inputJsonArrayString}]"
+          echo "::set-output name=INPUT_JSON_ARRAY::${inputJsonArrayString}"
+
+    outputs:
+      AZURESTACK_AAD_SECRET_SP_NAME: ${{ steps.environment_resolution_step.outputs.AZURESTACK_AAD_SECRET_SP_NAME }}
+      AZURESTACK_AAD_CERT_SP_NAME: ${{ steps.environment_resolution_step.outputs.AZURESTACK_AAD_CERT_SP_NAME }}
+      AZURESTACK_ADFS_SECRET_SP_NAME: ${{ steps.environment_resolution_step.outputs.AZURESTACK_ADFS_SECRET_SP_NAME }}
+      AZURESTACK_ADFS_CERT_SP_NAME: ${{ steps.environment_resolution_step.outputs.AZURESTACK_ADFS_CERT_SP_NAME }}
+      ENVIRONMENT_JSON_ARRAY: ${{ steps.environment_resolution_step.outputs.ENVIRONMENT_JSON_ARRAY }}
+      INPUT_JSON_ARRAY: ${{ steps.matrix_json_step.outputs.INPUT_JSON_ARRAY }}
+
+  Samples_CI:
+    runs-on: self-hosted
+    needs: Prepare_CI
+    env:
+      AZURESTACK_AAD_SECRET_SP_NAME: ${{ needs.Prepare_CI.outputs.AZURESTACK_AAD_SECRET_SP_NAME }}
+      AZURESTACK_AAD_CERT_SP_NAME: ${{ needs.Prepare_CI.outputs.AZURESTACK_AAD_CERT_SP_NAME }}
+      AZURESTACK_ADFS_SECRET_SP_NAME: ${{ needs.Prepare_CI.outputs.AZURESTACK_ADFS_SECRET_SP_NAME }}
+      AZURESTACK_ADFS_CERT_SP_NAME: ${{ needs.Prepare_CI.outputs.AZURESTACK_ADFS_CERT_SP_NAME }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ENVIRONMENT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.ENVIRONMENT_JSON_ARRAY) }}
+        INPUT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.INPUT_JSON_ARRAY) }}
+    steps:
+      - name: Checkout ${{ github.repository }}.
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Log in with Azure.
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_SP_CREDENTIALS }}
+          enable-AzPSSession: true
+
+      - name: Run Azure Stack SDK Samples.
+        shell: pwsh
+        env:
+          AZURESTACK_AAD_SECRET_SP: ${{ secrets[env.AZURESTACK_AAD_SECRET_SP_NAME] }}
+          AZURESTACK_AAD_CERT_SP: ${{ secrets[env.AZURESTACK_AAD_CERT_SP_NAME] }}
+          AZURESTACK_ADFS_SECRET_SP: ${{ secrets[env.AZURESTACK_ADFS_SECRET_SP_NAME] }}
+          AZURESTACK_ADFS_CERT_SP: ${{ secrets[env.AZURESTACK_ADFS_CERT_SP_NAME] }}
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          $config = Import-ConfigFile
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+          $githubRunId = "${{ github.run_id }}"
+          $clonedFolderName =  "${{ matrix.ENVIRONMENT_JSON_ARRAY }}-${{ matrix.INPUT_JSON_ARRAY }}" -replace ":","-"
+          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", "run${githubRunId}", $clonedFolderName)
+          if ((Test-Path -Path $samplesPath))
+          {
+            Remove-Item -Path $samplesPath -Force -Recurse
+          }
+          Push-Location -Path $env:AZURESTACK_SDK_CI_REPO
+          invoke-samplesinparallel.ps1 -Sample "${{ matrix.INPUT_JSON_ARRAY }}" `
+            -EnvironmentName "${{ matrix.ENVIRONMENT_JSON_ARRAY }}" `
+            -SamplesPath $samplesPath
+          Pop-Location
+
+  Cleanup:
+    runs-on: self-hosted
+    needs: Process_Logs
+    if: always()
+    steps:
+      - name: Clean up supplementary samples and logs folders.
+        if: always()
+        shell: pwsh
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          $config = Import-ConfigFile
+          $runFolder = "run${{ github.run_id }}"
+          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", $runFolder)
+          if ((Test-Path -Path $samplesPath))
+          {
+            Remove-Item -Path $samplesPath -Force -Recurse
+          }
+          $logsPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "logs", $runFolder)
+          if ((Test-Path -Path $logsPath))
+          {
+            Remove-Item -Path $logsPath -Force -Recurse
+          }
