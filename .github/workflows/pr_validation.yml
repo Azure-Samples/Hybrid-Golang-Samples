@@ -1,0 +1,166 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      identity_provider:
+        description: 'Select an identity provider, "aad" or "adfs", to run on the selected ASH environment type.'
+        required: true
+        default: 'adfs'
+      samples:
+        description: '[Optional] Enter semicolon delimted list of sample folder(s). E.g., "resourcegroup;storage" or "storage". By default all samples are run.'
+        required: false
+
+jobs:
+  Prepare_CI:
+    runs-on: Organization
+    steps:
+      - name: Checkout ${{ github.repository }}.
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Resolve environment and samples.
+        id: resolve_environment_and_samples
+        shell: pwsh
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          $config = Import-ConfigFile
+
+          # Get a random AAD and ADFS environment
+          $inputIdProvider = "${{ github.event.inputs.identity_provider }}" 
+          $environmentJsonArray = ""
+          if ($inputIdProvider)
+          {
+            if (($inputIdProvider -ne "aad") -and ($inputIdProvider -ne "adfs"))
+            {
+              throw "Invalid identity provider '${inputIdProvider}'."
+            }
+            $index = Get-Random -Maximum $config.environmentPools.($inputIdProvider).Count
+            $environmentName = ($config.environmentPools.($inputIdProvider))[$index]
+            $environmentJsonArray = "[`"${environmentName}`"]"
+          }
+          else
+          {
+            $aadIndex = Get-Random -Maximum $config.environmentPools.aad.Count
+            $adfsIndex = Get-Random -Maximum $config.environmentPools.adfs.Count
+            $aadEnvironmentName = $config.environmentPools.aad[$aadIndex]
+            $adfsEnvironmentName = $config.environmentPools.adfs[$adfsIndex]
+            $environmentJsonArray = "[`"${aadEnvironmentName}`",`"${adfsEnvironmentName}`"]"
+          }
+          echo "::set-output name=ENVIRONMENT_JSON_ARRAY::${environmentJsonArray}"
+
+          # Create JSON string output of samples to run.
+          $inputSamples = "${{ github.event.inputs.samples }}"
+          $inputJsonArrayString = ""
+          if ($inputSamples)
+          {
+            $branchName = ("${{ github.ref }}" -split "/")[-1]
+            $resolvedInputSet =  Resolve-Input -Samples "golang:${branchName}:[${inputSamples}]"
+            $inputJsonArrayString = ($resolvedInputSet | ForEach-Object {"`"${_}`""}) -join ","
+            $inputJsonArrayString = "[${inputJsonArrayString}]"
+          }
+          else
+          {
+            $resolvedInputSet =  Resolve-Input -Samples "golang"
+            $inputJsonArrayString = ($resolvedInputSet | ForEach-Object {"`"${_}`""}) -join ","
+            $inputJsonArrayString = "[${inputJsonArrayString}]"
+          }
+          echo "::set-output name=INPUT_JSON_ARRAY::${inputJsonArrayString}"
+
+    outputs:
+      ENVIRONMENT_JSON_ARRAY: ${{ steps.resolve_environment_and_samples.outputs.ENVIRONMENT_JSON_ARRAY }}
+      INPUT_JSON_ARRAY: ${{ steps.resolve_environment_and_samples.outputs.INPUT_JSON_ARRAY }}
+
+  Samples_CI:
+    runs-on: Organization
+    needs: Prepare_CI
+    strategy:
+      fail-fast: false
+      matrix:
+        ENVIRONMENT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.ENVIRONMENT_JSON_ARRAY) }}
+        INPUT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.INPUT_JSON_ARRAY) }}
+    steps:
+      - name: Checkout ${{ github.repository }}.
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Log in with Azure.
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_SP_CREDENTIALS }}
+          enable-AzPSSession: true
+
+      - name: Run Azure Stack SDK Samples.
+        shell: pwsh
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          $config = Import-ConfigFile
+
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+          $githubRunId = "${{ github.run_id }}"
+          $clonedFolderName =  "${{ matrix.ENVIRONMENT_JSON_ARRAY }}-${{ matrix.INPUT_JSON_ARRAY }}" -replace ":","-"
+          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", "run${githubRunId}", $clonedFolderName)
+          if ((Test-Path -Path $samplesPath))
+          {
+            Remove-Item -Path $samplesPath -Force -Recurse
+          }
+          ${{ github.workspace }}\invoke-samplesinparallel.ps1 -Sample "${{ matrix.INPUT_JSON_ARRAY }}" `
+            -EnvironmentName "${{ matrix.ENVIRONMENT_JSON_ARRAY }}" `
+            -SamplesPath $samplesPath
+
+  Process_Logs:
+    runs-on: Organization
+    needs: Samples_CI
+    if: always()
+    steps:
+      - name: Get job statuses.
+        id: get_job_statuses
+        shell: pwsh
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          $config = Import-ConfigFile
+          $runFolder = "run${{ github.run_id }}"
+          $logsFilePath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "logs", "hybrid-golang-samples", $runFolder, "jobStatuses.txt")
+          $rsaPrivateKeyFilePath = Resolve-StringExpression -UnresolvedPath $config.rsaPrivateKeyFilePath
+
+          Get-WorkflowJobStatuses -GithubAppId $config.githubAppId `
+            -RSAPrivateKeyFilePath $rsaPrivateKeyFilePath `
+            -RepositoryInfo "${{ github.repository }}" `
+            -RunId "${{ github.run_id }}" `
+            -OutputFilePath $logsFilePath
+
+          echo "::set-output name=LOGS_PATH::${logsFilePath}"
+
+      - name: Upload log file artifact.
+        uses: actions/upload-artifact@v2
+        with:
+          name: job_statuses${{ github.run_id }}
+          path: "${{ steps.get_job_statuses.outputs.LOGS_PATH }}"
+
+  Cleanup:
+    runs-on: Organization
+    needs: Process_Logs
+    if: always()
+    steps:
+      - name: Clean up supplementary samples and logs folders.
+        if: always()
+        shell: pwsh
+        run: |
+          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
+          $config = Import-ConfigFile
+          $runFolder = "run${{ github.run_id }}"
+          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", "hybrid-golang-samples", $runFolder)
+          if ((Test-Path -Path $samplesPath))
+          {
+            Remove-Item -Path $samplesPath -Force -Recurse
+          }
+          $logsPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "logs", "hybrid-golang-samples", $runFolder)
+          if ((Test-Path -Path $logsPath))
+          {
+            Remove-Item -Path $logsPath -Force -Recurse
+          }
