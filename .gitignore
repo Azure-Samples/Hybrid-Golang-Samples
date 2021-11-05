@@ -6,6 +6,10 @@
 # Visual Studio Code
 .vscode/
 
+# Azure Stack configuration
+azureAppSpConfig.json
+azureCertSpConfig.json
+
 # User-specific files
 *.suo
 *.user
