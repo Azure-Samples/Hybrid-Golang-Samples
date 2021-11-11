@@ -1,5 +1,5 @@
 # Hybrid-Compute-GO-Create-VM
-
+test
 These samples demonstrate how to create Virtual Machines using the Azure SDK for Go on Azure Stack.
 The code provided shows how to do the following:
 

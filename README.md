@@ -9,7 +9,7 @@ urlFragment: Hybrid-Golang-Samples
 ---
 
 # Hybrid-Golang-Samples
-
+test
 <!-- 
 Guidelines on README format: https://review.docs.microsoft.com/help/onboard/admin/samples/concepts/readme-template?branch=master
 
