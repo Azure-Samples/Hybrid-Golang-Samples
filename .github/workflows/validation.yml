@@ -72,11 +72,6 @@ jobs:
         ENVIRONMENT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.ENVIRONMENT_JSON_ARRAY) }}
         INPUT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.INPUT_JSON_ARRAY) }}
     steps:
-      - name: Checkout ${{ github.repository }}.
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.ref }}
-
       - name: Log in with Azure.
         uses: azure/login@v1
         with:
@@ -89,8 +84,7 @@ jobs:
           Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
           $config = Import-ConfigFile
 
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
-          $clonedFolderName =  "${{ matrix.ENVIRONMENT_JSON_ARRAY }}-${{ matrix.INPUT_JSON_ARRAY }}" -replace ":","-"
+          Write-Host -Message "Current workspace: ${{ github.workspace }}"
           $samplesPath = [System.IO.Path]::Combine("${{ github.workspace }}", "samples", "hybrid-golang-samples", "run${{ github.run_id }}", $clonedFolderName)
           if ((Test-Path -Path $samplesPath))
           {
