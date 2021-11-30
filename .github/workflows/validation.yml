@@ -91,7 +91,7 @@ jobs:
 
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
           $clonedFolderName =  "${{ matrix.ENVIRONMENT_JSON_ARRAY }}-${{ matrix.INPUT_JSON_ARRAY }}" -replace ":","-"
-          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", "hybrid-golang-samples", "run${{ github.run_id }}", $clonedFolderName)
+          $samplesPath = [System.IO.Path]::Combine("${{ github.workspace }}", "samples", "hybrid-golang-samples", "run${{ github.run_id }}", $clonedFolderName)
           if ((Test-Path -Path $samplesPath))
           {
             Remove-Item -Path $samplesPath -Force -Recurse
@@ -99,20 +99,3 @@ jobs:
           & "$($env:AZURESTACK_SDK_CI_REPO)\invoke-samplesinparallel.ps1" -Sample "${{ matrix.INPUT_JSON_ARRAY }}" `
             -EnvironmentName "${{ matrix.ENVIRONMENT_JSON_ARRAY }}" `
             -SamplesPath $samplesPath
-
-  Cleanup:
-    runs-on: org
-    needs: Samples_CI
-    if: always()
-    steps:
-      - name: Clean up samples.
-        if: always()
-        shell: pwsh
-        run: |
-          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
-          $config = Import-ConfigFile
-          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", "hybrid-golang-samples", "run${{ github.run_id }}")
-          if ((Test-Path -Path $samplesPath))
-          {
-            Remove-Item -Path $samplesPath -Force -Recurse
-          }
