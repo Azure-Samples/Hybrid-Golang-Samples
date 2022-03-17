@@ -30,7 +30,7 @@ var (
 	resourceGroupName  = "azure-sample-golang-vm"
 )
 
-type AzureAppSpConfig struct {
+type AzureSecretSpConfig struct {
 	ClientId           string
 	ClientSecret       string
 	ClientObjectId     string
@@ -42,7 +42,7 @@ type AzureAppSpConfig struct {
 
 func main() {
 	// Read configuration file for Azure Stack environment details.
-	var configFile = "azureAppSpConfig.json"
+	var configFile = "azureSecretSpConfig.json"
 	var configFilePath = "../" + configFile
 	_, err := os.Stat(configFilePath)
 	if err != nil {
@@ -52,7 +52,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read configuration file %s.", configFile)
 	}
-	var config AzureAppSpConfig
+	var config AzureSecretSpConfig
 	err = json.Unmarshal([]byte(data), &config)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal data from %s.", configFile)

@@ -7,7 +7,7 @@
 .vscode/
 
 # Azure Stack configuration
-azureAppSpConfig.json
+azureSecretSpConfig.json
 azureCertSpConfig.json
 
 # User-specific files
