@@ -34,30 +34,30 @@ Some of the configuration parameters from service principal objects may not be u
 
 Set the following JSON properties in `./azureSecretSpConfig.json`.
 
-| Variable              | Description                                                 |
-|-----------------------|-------------------------------------------------------------|
-| `clientId`            | Service principal application id.                            |
-| `clientSecret`        | Service principal application secret.                        |
-| `clientObjectId`      | Service principal object id.                                 |
-| `tenantId`            | Azure Stack Hub tenant id.                                   |
-| `subscriptionId`      | Subscription id used to access offers in Azure Stack Hub.    |
-| `resourceManagerUrl`  | Azure Stack Hub Resource Manager Endpoint.                   |
-| `location`            | Azure Resource location.                                     |
+| Variable                      | Description                                                  |
+|-------------------------------|--------------------------------------------------------------|
+| `clientId`                    | Service principal application id.                            |
+| `clientSecret`                | Service principal application secret.                        |
+| `objectId`                    | Service principal object id.                                 |
+| `tenantId`                    | Azure Stack Hub tenant id.                                   |
+| `subscriptionId`              | Subscription id used to access offers in Azure Stack Hub.    |
+| `resourceManagerEndpointUrl`  | Azure Stack Hub Resource Manager Endpoint.                   |
+| `location`                    | Azure Resource location.                                     |
 
 ### Setup Certificate Service Principal 
 
 The certificate service principal will be similar in output to secret service principal, except it uses `./azureCertSpConfig.json` config file.
 
-| Variable              | Description                                                 |
-|-----------------------|-------------------------------------------------------------|
-| `clientId`            | Service principal application id.                            |
-| `certPass`            | Certificate password                                        |
-| `certPath`            | "/" separated path to the certificate.                      |
-| `clientObjectId`      | Service principal object id.                                 |
-| `tenantId`            | Azure Stack Hub tenant id.                                   |
-| `subscriptionId`      | Subscription id used to access offers in Azure Stack Hub.    |
-| `resourceManagerUrl`  | Azure Stack Hub Resource Manager Endpoint.                   |
-| `location`            | Azure Resource location.                                     |
+| Variable                      | Description                                                  |
+|-------------------------------|--------------------------------------------------------------|
+| `clientId`                    | Service principal application id.                            |
+| `certPass`                    | Certificate password                                         |
+| `certPath`                    | "/" separated path to the certificate.                       |
+| `objectId`                    | Service principal object id.                                 |
+| `tenantId`                    | Azure Stack Hub tenant id.                                   |
+| `subscriptionId`              | Subscription id used to access offers in Azure Stack Hub.    |
+| `resourceManagerEndpointUrl`  | Azure Stack Hub Resource Manager Endpoint.                   |
+| `location`                    | Azure Resource location.                                     |
 
 Service principal PowerShell object output example for secret service principal:
 
@@ -67,14 +67,14 @@ Secret                : System.Security.SecureString                            
 ServicePrincipalNames : {bd6bb75f-5fd6-4db9-91b7-4a6941e7feb9, http://azs-sptest01}
 ApplicationId         : bd6bb75f-5fd6-4db9-91b7-4a6941e7feb9                         # clientId
 DisplayName           : azs-sptest01
-Id                    : 36a22ee4-e2b0-411d-8f21-0ea8b4b5c46f                         # clientObjectId
+Id                    : 36a22ee4-e2b0-411d-8f21-0ea8b4b5c46f                         # objectId
 AdfsId                : 
 Type                  : ServicePrincipal
 ```
 
 ADFS
 ```
-ApplicationIdentifier : S-1-5-21-2937821301-3551617933-4294865508-76632              # clientObjectId
+ApplicationIdentifier : S-1-5-21-2937821301-3551617933-4294865508-76632              # objectId
 ClientId              : 7591924e-0341-4812-8d23-52ef0aa27eff                         # clientId
 Thumbprint            : 
 ApplicationName       : Azurestack-azs-sptest01

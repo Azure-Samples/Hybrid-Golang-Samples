@@ -32,14 +32,14 @@ var (
 )
 
 type AzureCertSpConfig struct {
-	ClientId           string
-	CertPass           string
-	CertPath           string
-	ClientObjectId     string
-	SubscriptionId     string
-	TenantId           string
-	ResourceManagerUrl string
-	Location           string
+	ClientId                   string
+	CertPass                   string
+	CertPath                   string
+	ObjectId                   string
+	SubscriptionId             string
+	TenantId                   string
+	ResourceManagerEndpointUrl string
+	Location                   string
 }
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 		log.Fatalf("Both VM admin password and SSH key pair path %s are invalid. At least one required to create VM. Usage for password authentication: go run app.go <PASSWORD>", sshPublicKeyPath)
 	}
 	cntx := context.Background()
-	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerUrl)
+	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
 	splitEndpoint := strings.Split(environment.ActiveDirectoryEndpoint, "/")
 	splitEndpointlastIndex := len(splitEndpoint) - 1
 	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
@@ -91,7 +91,7 @@ func main() {
 			cntx,
 			resourceGroupName,
 			config.CertPath,
-			config.ResourceManagerUrl,
+			config.ResourceManagerEndpointUrl,
 			config.TenantId,
 			config.ClientId,
 			config.CertPass,
@@ -111,7 +111,7 @@ func main() {
 		resourceGroupName,
 		config.Location,
 		config.CertPath,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
@@ -132,7 +132,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -151,7 +151,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -170,7 +170,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -193,7 +193,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -214,7 +214,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId)
 	if errSa != nil {
 		log.Fatal(errSa.Error())
@@ -238,7 +238,7 @@ func main() {
 		config.ClientId,
 		config.CertPass,
 		config.CertPath,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId)
 	if errVM != nil {
 		log.Fatal(errVM.Error())
