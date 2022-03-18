@@ -2,9 +2,9 @@
     "clientId": "",
     "certPass": "",
     "certPath": "",
-    "clientObjectId": "",
+    "objectId": "",
     "subscriptionId": "",
     "tenantId": "",
-    "resourceManagerUrl": "",
+    "resourceManagerEndpointUrl": "",
     "location": ""
 }

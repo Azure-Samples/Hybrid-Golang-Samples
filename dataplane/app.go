@@ -23,14 +23,14 @@ var (
 )
 
 type AzureCertSpConfig struct {
-	ClientId           string
-	CertPass           string
-	CertPath           string
-	ClientObjectId     string
-	SubscriptionId     string
-	TenantId           string
-	ResourceManagerUrl string
-	Location           string
+	ClientId                   string
+	CertPass                   string
+	CertPath                   string
+	ObjectId                   string
+	SubscriptionId             string
+	TenantId                   string
+	ResourceManagerEndpointUrl string
+	Location                   string
 }
 
 func main() {
@@ -51,10 +51,10 @@ func main() {
 		log.Fatalf("Failed to unmarshal data from %s.", configFile)
 	}
 
-	storageEndpointSuffix := strings.TrimRight(config.ResourceManagerUrl[strings.Index(config.ResourceManagerUrl, ".")+1:], "/")
+	storageEndpointSuffix := strings.TrimRight(config.ResourceManagerEndpointUrl[strings.Index(config.ResourceManagerEndpointUrl, ".")+1:], "/")
 
 	cntx := context.Background()
-	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerUrl)
+	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
 	splitEndpoint := strings.Split(environment.ActiveDirectoryEndpoint, "/")
 	splitEndpointlastIndex := len(splitEndpoint) - 1
 	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
@@ -68,7 +68,7 @@ func main() {
 			cntx,
 			resourceGroupName,
 			config.CertPath,
-			config.ResourceManagerUrl,
+			config.ResourceManagerEndpointUrl,
 			config.TenantId,
 			config.ClientId,
 			config.CertPass,
@@ -88,7 +88,7 @@ func main() {
 		resourceGroupName,
 		config.Location,
 		config.CertPath,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
@@ -105,7 +105,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.CertPath,
 		config.SubscriptionId)
 	if &storageAccountClient == nil {
