@@ -10,10 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	hybridresources "dataplane/hybridresources"
+	hybridresources "dataplane/hybridResources"
 	hybridstorage "dataplane/hybridstorage"
-
-	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 var (
@@ -54,21 +52,14 @@ func main() {
 	storageEndpointSuffix := strings.TrimRight(config.ResourceManagerEndpointUrl[strings.Index(config.ResourceManagerEndpointUrl, ".")+1:], "/")
 
 	cntx := context.Background()
-	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
-	splitEndpoint := strings.Split(environment.ActiveDirectoryEndpoint, "/")
-	splitEndpointlastIndex := len(splitEndpoint) - 1
-	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
-		config.TenantId = "adfs"
-	}
 
 	if len(os.Args) == 2 && os.Args[1] == "clean" {
 		fmt.Printf("Deleting resource group '%s'...\n", resourceGroupName)
 		//Create a resource group on Azure Stack
-		_, err := hybridresources.DeleteResourceGroup(
+		err := hybridresources.DeleteResourceGroup(
 			cntx,
 			resourceGroupName,
 			config.CertPath,
-			config.ResourceManagerEndpointUrl,
 			config.TenantId,
 			config.ClientId,
 			config.CertPass,
@@ -88,7 +79,6 @@ func main() {
 		resourceGroupName,
 		config.Location,
 		config.CertPath,
-		config.ResourceManagerEndpointUrl,
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
@@ -101,14 +91,14 @@ func main() {
 
 	fmt.Printf("Getting storage account client...\n")
 	// Create a storge account client
-	storageAccountClient := hybridstorage.GetStorageAccountsClient(
+	storageAccountClient, err := hybridstorage.GetStorageAccountsClient(
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
 		config.ResourceManagerEndpointUrl,
 		config.CertPath,
 		config.SubscriptionId)
-	if &storageAccountClient == nil {
+	if err != nil {
 		log.Fatal("Failed to get storage account client.\n")
 	} else {
 		fmt.Printf("Successfully got storage account client.\n")
@@ -118,7 +108,7 @@ func main() {
 	// Create storage account
 	_, errSa := hybridstorage.CreateStorageAccount(
 		cntx,
-		storageAccountClient,
+		*storageAccountClient,
 		storageAccountName,
 		resourceGroupName,
 		config.Location)
@@ -131,7 +121,7 @@ func main() {
 	fmt.Printf("Getting dataplane URL...\n")
 	dataplaneURL, errDP := hybridstorage.GetDataplaneURL(
 		cntx,
-		storageAccountClient,
+		*storageAccountClient,
 		storageEndpointSuffix,
 		storageAccountName,
 		resourceGroupName,

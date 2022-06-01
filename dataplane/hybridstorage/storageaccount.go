@@ -11,26 +11,26 @@ import (
 
 	"dataplane/iam"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/storage/mgmt/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-storage-blob-go/azblob"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 )
 
 const (
 	errorPrefix = "Cannot create storage account, reason: %v"
 )
 
-func getStorageAccountKey(cntx context.Context, storageAccountsClient storage.AccountsClient, resourceGroupName, storageAccountName string) (key string, err error) {
+func getStorageAccountKey(cntx context.Context, storageAccountsClient armstorage.AccountsClient, resourceGroupName, storageAccountName string) (key string, err error) {
 	listKeys, err := storageAccountsClient.ListKeys(
 		cntx,
 		resourceGroupName,
-		storageAccountName)
+		storageAccountName,
+		nil)
 	if err != nil {
 		return key, fmt.Errorf("cannot list storage account keys: %v", err)
 	}
-	storageAccountKeys := *listKeys.Keys
-	key = *storageAccountKeys[0].Value
+	key = *(listKeys.Keys[0].Value)
+
 	return key, err
 }
 
@@ -55,7 +55,7 @@ func UploadDataToContainer(cntx context.Context, containerURL azblob.ContainerUR
 }
 
 // GetDataplaneURL returns dataplane URL
-func GetDataplaneURL(cntx context.Context, storageAccountsClient storage.AccountsClient, storageEndpointSuffix, storageAccountName, resourceGroupName, storageContainerName string) (containerURL azblob.ContainerURL, err error) {
+func GetDataplaneURL(cntx context.Context, storageAccountsClient armstorage.AccountsClient, storageEndpointSuffix, storageAccountName, resourceGroupName, storageContainerName string) (containerURL azblob.ContainerURL, err error) {
 	storageAccountKey, err := getStorageAccountKey(cntx, storageAccountsClient, resourceGroupName, storageAccountName)
 	if err != nil {
 		return containerURL, fmt.Errorf("cannot get stroage account key: %v", err)
@@ -74,46 +74,50 @@ func GetDataplaneURL(cntx context.Context, storageAccountsClient storage.Account
 }
 
 // GetStorageAccountsClient creates a new storage account client
-func GetStorageAccountsClient(tenantID, clientID, certPass, armEndpoint, certPath, subscriptionID string) storage.AccountsClient {
-	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
+func GetStorageAccountsClient(tenantID, clientID, certPass, armEndpoint, certPath, subscriptionID string) (*armstorage.AccountsClient, error) {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, certPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
-	storageAccountsClient := storage.NewAccountsClientWithBaseURI(armEndpoint, subscriptionID)
-	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(token)
-	return storageAccountsClient
+
+	return armstorage.NewAccountsClient(subscriptionID, token, nil)
 }
 
 // CreateStorageAccount creates a new storage account.
-func CreateStorageAccount(cntx context.Context, storageAccountsClient storage.AccountsClient, accountName, rgName, location string) (s storage.Account, err error) {
+func CreateStorageAccount(cntx context.Context, storageAccountsClient armstorage.AccountsClient, accountName, rgName, location string) (s armstorage.Account, err error) {
 	result, err := storageAccountsClient.CheckNameAvailability(
 		cntx,
-		storage.AccountCheckNameAvailabilityParameters{
-			Name: to.StringPtr(accountName),
-			Type: to.StringPtr("Microsoft.Storage/storageAccounts"),
-		})
+		armstorage.AccountCheckNameAvailabilityParameters{
+			Name: to.Ptr(accountName),
+			Type: to.Ptr("Microsoft.Storage/storageAccounts"),
+		},
+		nil)
 	if err != nil {
 		return s, fmt.Errorf(errorPrefix, err)
 	}
 	if *result.NameAvailable != true {
 		return s, fmt.Errorf(errorPrefix, fmt.Sprintf("storage account name [%v] not available", accountName))
 	}
-	future, err := storageAccountsClient.Create(
+	future, err := storageAccountsClient.BeginCreate(
 		cntx,
 		rgName,
 		accountName,
-		storage.AccountCreateParameters{
-			Sku: &storage.Sku{
-				Name: storage.StandardLRS},
-			Location:                          to.StringPtr(location),
-			AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{},
-		})
+		armstorage.AccountCreateParameters{
+			SKU: &armstorage.SKU{
+				Name: to.Ptr(armstorage.SKUNameStandardLRS),
+			},
+			Location:   to.Ptr(location),
+			Properties: &armstorage.AccountPropertiesCreateParameters{},
+		},
+		nil)
 	if err != nil {
 		return s, fmt.Errorf(fmt.Sprintf(errorPrefix, err))
 	}
-	err = future.WaitForCompletionRef(cntx, storageAccountsClient.Client)
+
+	resp, err := future.PollUntilDone(cntx, nil)
 	if err != nil {
 		return s, fmt.Errorf(fmt.Sprintf(errorPrefix, fmt.Sprintf("cannot get the storage account create future response: %v", err)))
 	}
-	return future.Result(storageAccountsClient)
+
+	return resp.Account, nil
 }
