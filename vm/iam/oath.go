@@ -6,8 +6,8 @@
 package iam
 
 import (
-	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 )
 
 const (
@@ -25,17 +25,6 @@ const (
 )
 
 // GetResourceManagementTokenHybrid retrieves auth token for hybrid environment
-func GetResourceManagementTokenHybrid(armEndpoint, tenantID, clientID, clientSecret string) (adal.OAuthTokenProvider, error) {
-	var token adal.OAuthTokenProvider
-	environment, err := azure.EnvironmentFromURL(armEndpoint)
-	tokenAudience := environment.TokenAudience
-	activeDirectoryEndpoint := environment.ActiveDirectoryEndpoint
-	oauthConfig, err := adal.NewOAuthConfig(activeDirectoryEndpoint, tenantID)
-	token, err = adal.NewServicePrincipalToken(
-		*oauthConfig,
-		clientID,
-		clientSecret,
-		tokenAudience)
-
-	return token, err
+func GetResourceManagementTokenHybrid(tenantID, clientID, clientSecret string) (azcore.TokenCredential, error) {
+	return azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
 }

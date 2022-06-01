@@ -7,29 +7,29 @@ import (
 
 	"vm/iam"
 
-	azurestack "github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/resources/mgmt/resources"
-	"github.com/Azure/go-autorest/autorest"
+	azurestack "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 )
 
 const (
 	errorPrefix = "Cannot create resource group, reason: %v"
 )
 
-func getResourceGroupsClient(armEndpoint, tenantID, clientID, clientSecret, subscriptionID string) azurestack.GroupsClient {
-	token, err := iam.GetResourceManagementTokenHybrid(armEndpoint, tenantID, clientID, clientSecret)
+func getResourceGroupsClient(tenantID, clientID, clientSecret, subscriptionID string) (*azurestack.ResourceGroupsClient, error) {
+	token, err := iam.GetResourceManagementTokenHybrid(tenantID, clientID, clientSecret)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
 
-	groupsClient := azurestack.NewGroupsClientWithBaseURI(armEndpoint, subscriptionID)
-	groupsClient.Authorizer = autorest.NewBearerAuthorizer(token)
-	return groupsClient
+	return azurestack.NewResourceGroupsClient(subscriptionID, token, nil)
 }
 
 // CreateResourceGroup creates resource group
-func CreateResourceGroup(cntx context.Context, resourceGroupName, location, armEndpoint, tenantID, clientID, clientSecret, subscriptionID string) (name *string, err error) {
-	groupClient := getResourceGroupsClient(armEndpoint, tenantID, clientID, clientSecret, subscriptionID)
-	rg, errRg := groupClient.CreateOrUpdate(cntx, resourceGroupName, azurestack.Group{Location: &location})
+func CreateResourceGroup(cntx context.Context, resourceGroupName, location, tenantID, clientID, clientSecret, subscriptionID string) (name *string, err error) {
+	groupClient, err := getResourceGroupsClient(tenantID, clientID, clientSecret, subscriptionID)
+	if err != nil {
+		return name, err
+	}
+	rg, errRg := groupClient.CreateOrUpdate(cntx, resourceGroupName, azurestack.ResourceGroup{Location: &location}, nil)
 	if errRg == nil {
 		name = rg.Name
 	}
@@ -37,15 +37,18 @@ func CreateResourceGroup(cntx context.Context, resourceGroupName, location, armE
 	return name, err
 }
 
-func DeleteResourceGroup(cntx context.Context, resourceGroupName, armEndpoint, tenantID, clientID, clientSecret, subscriptionID string) (resp autorest.Response, err error) {
-	groupClient := getResourceGroupsClient(armEndpoint, tenantID, clientID, clientSecret, subscriptionID)
-	future, err := groupClient.Delete(cntx, resourceGroupName)
+func DeleteResourceGroup(cntx context.Context, resourceGroupName, tenantID, clientID, clientSecret, subscriptionID string) error {
+	groupClient, err := getResourceGroupsClient(tenantID, clientID, clientSecret, subscriptionID)
 	if err != nil {
-		return resp, err
+		return err
 	}
-	err = future.WaitForCompletionRef(cntx, groupClient.Client)
+	future, err := groupClient.BeginDelete(cntx, resourceGroupName, nil)
 	if err != nil {
-		return resp, err
+		return err
 	}
-	return future.Result(groupClient)
+	_, err = future.PollUntilDone(cntx, nil)
+	if err != nil {
+		return err
+	}
+	return nil
 }

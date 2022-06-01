@@ -14,8 +14,6 @@ import (
 	hybridstorage "vm/hybridStorage"
 	"vm/hybridcompute"
 	"vm/hybridnetwork"
-
-	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 var (
@@ -78,22 +76,12 @@ func main() {
 
 	cntx := context.Background()
 
-	// Determine whether the environment is ADFS or AAD.
-	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
-	splitEndpoint := strings.Split(environment.ActiveDirectoryEndpoint, "/")
-	splitEndpointlastIndex := len(splitEndpoint) - 1
-	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
-		config.TenantId = "adfs"
-	}
-	storageEndpointSuffix := environment.StorageEndpointSuffix
-
 	if len(os.Args) == 2 && os.Args[1] == "clean" {
 		fmt.Printf("Deleting resource group '%s'...\n", resourceGroupName)
 		//Create a resource group on Azure Stack
-		_, err := hybridresources.DeleteResourceGroup(
+		err := hybridresources.DeleteResourceGroup(
 			cntx,
 			resourceGroupName,
-			config.ResourceManagerEndpointUrl,
 			config.TenantId,
 			config.ClientId,
 			config.ClientSecret,
@@ -112,7 +100,6 @@ func main() {
 		cntx,
 		resourceGroupName,
 		config.Location,
-		config.ResourceManagerEndpointUrl,
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
@@ -132,7 +119,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -150,7 +136,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -168,7 +153,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -190,7 +174,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -210,7 +193,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId)
 	if errSa != nil {
 		log.Fatal(errSa.Error())
@@ -219,6 +201,8 @@ func main() {
 	}
 
 	fmt.Printf("Creating vm '%s'...\n", vmName)
+	// Get-AzEnvironment | select Name, StorageEndpointSuffix
+	storageEndpointSuffix := "core.windows.net"
 	// Create virtual machine on Azure Stack
 	_, errVM := hybridcompute.CreateVM(cntx,
 		vmName,
@@ -232,7 +216,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		storageEndpointSuffix)
 	if errVM != nil {
