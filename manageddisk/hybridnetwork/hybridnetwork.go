@@ -12,250 +12,281 @@ import (
 
 	"manageddisk/iam"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/network/mgmt/network"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 )
 
 const (
 	errorPrefix = "Cannot create %v, reason: %v"
 )
 
-func getVnetClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID string) network.VirtualNetworksClient {
-	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
+func getVnetClient(certPath, tenantID, clientID, certPass, subscriptionID string) (*armnetwork.VirtualNetworksClient, error) {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, certPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, "vnet", fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
-	vnetClient := network.NewVirtualNetworksClientWithBaseURI(armEndpoint, subscriptionID)
-	vnetClient.Authorizer = autorest.NewBearerAuthorizer(token)
 
-	return vnetClient
+	return armnetwork.NewVirtualNetworksClient(subscriptionID, token, nil)
 }
 
-func getNsgClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID string) network.SecurityGroupsClient {
-	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
+func getNsgClient(certPath, tenantID, clientID, certPass, subscriptionID string) (*armnetwork.SecurityGroupsClient, error) {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, certPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, "NSG", fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
-	nsgClient := network.NewSecurityGroupsClientWithBaseURI(armEndpoint, subscriptionID)
-	nsgClient.Authorizer = autorest.NewBearerAuthorizer(token)
-	return nsgClient
+	return armnetwork.NewSecurityGroupsClient(subscriptionID, token, nil)
 }
 
-func getIPClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID string) network.PublicIPAddressesClient {
-	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
+func getIPClient(certPath, tenantID, clientID, certPass, subscriptionID string) (*armnetwork.PublicIPAddressesClient, error) {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, certPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, "IP", fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
-	ipClient := network.NewPublicIPAddressesClientWithBaseURI(armEndpoint, subscriptionID)
-	ipClient.Authorizer = autorest.NewBearerAuthorizer(token)
-	return ipClient
+	return armnetwork.NewPublicIPAddressesClient(subscriptionID, token, nil)
 }
 
-func getNicClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID string) network.InterfacesClient {
-	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
+func getNicClient(certPath, tenantID, clientID, certPass, subscriptionID string) (*armnetwork.InterfacesClient, error) {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, certPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, "NIC", fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
-	nicClient := network.NewInterfacesClientWithBaseURI(armEndpoint, subscriptionID)
-	nicClient.Authorizer = autorest.NewBearerAuthorizer(token)
-	return nicClient
+	return armnetwork.NewInterfacesClient(subscriptionID, token, nil)
 }
 
-func getSubnetsClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID string) network.SubnetsClient {
-	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, armEndpoint, certPath)
+func getSubnetsClient(certPath, tenantID, clientID, certPass, subscriptionID string) (*armnetwork.SubnetsClient, error) {
+	token, err := iam.GetResourceManagementToken(tenantID, clientID, certPass, certPath)
 	if err != nil {
 		log.Fatal(fmt.Sprintf(errorPrefix, "subnet", fmt.Sprintf("Cannot generate token. Error details: %v.", err)))
 	}
-	subnetsClient := network.NewSubnetsClientWithBaseURI(armEndpoint, subscriptionID)
-	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(token)
-	return subnetsClient
+	return armnetwork.NewSubnetsClient(subscriptionID, token, nil)
 }
 
 // CreateVirtualNetworkAndSubnets creates a virtual network with two subnets
-func CreateVirtualNetworkAndSubnets(cntx context.Context, vnetName, subnetName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName, location string) (vnet network.VirtualNetwork, err error) {
+func CreateVirtualNetworkAndSubnets(cntx context.Context, vnetName, subnetName, certPath, tenantID, clientID, certPass, subscriptionID, rgName, location string) (vnet armnetwork.VirtualNetwork, err error) {
 	resourceName := "virtual network and subnet"
-	vnetClient := getVnetClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	future, err := vnetClient.CreateOrUpdate(
+	vnetClient, err := getVnetClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return vnet, err
+	}
+	future, err := vnetClient.BeginCreateOrUpdate(
 		cntx,
 		rgName,
 		vnetName,
-		network.VirtualNetwork{
-			Location: to.StringPtr(location),
-			VirtualNetworkPropertiesFormat: &network.VirtualNetworkPropertiesFormat{
-				AddressSpace: &network.AddressSpace{
-					AddressPrefixes: &[]string{"10.0.0.0/8"},
+		armnetwork.VirtualNetwork{
+			Location: to.Ptr(location),
+			Properties: &armnetwork.VirtualNetworkPropertiesFormat{
+				AddressSpace: &armnetwork.AddressSpace{
+					AddressPrefixes: []*string{to.Ptr("10.0.0.0/8")},
 				},
-				Subnets: &[]network.Subnet{
+				Subnets: []*armnetwork.Subnet{
 					{
-						Name: to.StringPtr(subnetName),
-						SubnetPropertiesFormat: &network.SubnetPropertiesFormat{
-							AddressPrefix: to.StringPtr("10.0.0.0/16"),
+						Name: to.Ptr(subnetName),
+						Properties: &armnetwork.SubnetPropertiesFormat{
+							AddressPrefix: to.Ptr("10.0.0.0/16"),
 						},
 					},
 				},
 			},
-		})
-
+		},
+		nil,
+	)
 	if err != nil {
 		return vnet, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
 
-	err = future.WaitForCompletionRef(cntx, vnetClient.Client)
+	resp, err := future.PollUntilDone(cntx, nil)
 	if err != nil {
 		return vnet, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get the vnet create or update future response: %v", err)))
 	}
 
-	return future.Result(vnetClient)
+	return resp.VirtualNetwork, nil
 }
 
 // CreateNetworkSecurityGroup creates a new network security group
-func CreateNetworkSecurityGroup(cntx context.Context, nsgName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName, location string) (nsg network.SecurityGroup, err error) {
+func CreateNetworkSecurityGroup(cntx context.Context, nsgName, certPath, tenantID, clientID, certPass, subscriptionID, rgName, location string) (nsg armnetwork.SecurityGroup, err error) {
 	resourceName := "security group"
-	nsgClient := getNsgClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	future, err := nsgClient.CreateOrUpdate(
+	nsgClient, err := getNsgClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return nsg, err
+	}
+	future, err := nsgClient.BeginCreateOrUpdate(
 		cntx,
 		rgName,
 		nsgName,
-		network.SecurityGroup{
-			Location: to.StringPtr(location),
-			SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{
-				SecurityRules: &[]network.SecurityRule{
+		armnetwork.SecurityGroup{
+			Location: to.Ptr(location),
+			Properties: &armnetwork.SecurityGroupPropertiesFormat{
+				SecurityRules: []*armnetwork.SecurityRule{
 					{
-						Name: to.StringPtr("allow_ssh"),
-						SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
-							Protocol:                 network.SecurityRuleProtocolTCP,
-							SourceAddressPrefix:      to.StringPtr("0.0.0.0/0"),
-							SourcePortRange:          to.StringPtr("1-65535"),
-							DestinationAddressPrefix: to.StringPtr("0.0.0.0/0"),
-							DestinationPortRange:     to.StringPtr("22"),
-							Access:                   network.SecurityRuleAccessAllow,
-							Direction:                network.SecurityRuleDirectionInbound,
-							Priority:                 to.Int32Ptr(100),
+						Name: to.Ptr("allow_ssh"),
+						Properties: &armnetwork.SecurityRulePropertiesFormat{
+							Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+							SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+							SourcePortRange:          to.Ptr("1-65535"),
+							DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+							DestinationPortRange:     to.Ptr("22"),
+							Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+							Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+							Priority:                 to.Ptr[int32](100),
 						},
 					},
 					{
-						Name: to.StringPtr("allow_https"),
-						SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
-							Protocol:                 network.SecurityRuleProtocolTCP,
-							SourceAddressPrefix:      to.StringPtr("0.0.0.0/0"),
-							SourcePortRange:          to.StringPtr("1-65535"),
-							DestinationAddressPrefix: to.StringPtr("0.0.0.0/0"),
-							DestinationPortRange:     to.StringPtr("443"),
-							Access:                   network.SecurityRuleAccessAllow,
-							Direction:                network.SecurityRuleDirectionInbound,
-							Priority:                 to.Int32Ptr(200),
+						Name: to.Ptr("allow_https"),
+						Properties: &armnetwork.SecurityRulePropertiesFormat{
+							Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+							SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+							SourcePortRange:          to.Ptr("1-65535"),
+							DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+							DestinationPortRange:     to.Ptr("443"),
+							Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+							Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+							Priority:                 to.Ptr[int32](200),
 						},
 					},
 				},
 			},
 		},
+		nil,
 	)
-
 	if err != nil {
 		return nsg, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
 
-	err = future.WaitForCompletionRef(cntx, nsgClient.Client)
+	resp, err := future.PollUntilDone(cntx, nil)
 	if err != nil {
 		return nsg, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get nsg create or update future response: %v", err)))
 	}
 
-	return future.Result(nsgClient)
+	return resp.SecurityGroup, nil
 }
 
 // CreatePublicIP creates a new public IP
-func CreatePublicIP(cntx context.Context, ipName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName, location string) (ip network.PublicIPAddress, err error) {
+func CreatePublicIP(cntx context.Context, ipName, certPath, tenantID, clientID, certPass, subscriptionID, rgName, location string) (ip armnetwork.PublicIPAddress, err error) {
 	resourceName := "public IP"
-	ipClient := getIPClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	future, err := ipClient.CreateOrUpdate(
+	ipClient, err := getIPClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return ip, err
+	}
+	future, err := ipClient.BeginCreateOrUpdate(
 		cntx,
 		rgName,
 		ipName,
-		network.PublicIPAddress{
-			Name:     to.StringPtr(ipName),
-			Location: to.StringPtr(location),
-			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-				PublicIPAllocationMethod: network.Static,
+		armnetwork.PublicIPAddress{
+			Name:     to.Ptr(ipName),
+			Location: to.Ptr(location),
+			Properties: &armnetwork.PublicIPAddressPropertiesFormat{
+				PublicIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodStatic),
 			},
 		},
+		nil,
 	)
-
 	if err != nil {
 		return ip, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
 
-	err = future.WaitForCompletionRef(cntx, ipClient.Client)
+	resp, err := future.PollUntilDone(cntx, nil)
 	if err != nil {
 		return ip, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get public ip address create or update future response: %v", err)))
 	}
-	return future.Result(ipClient)
+	return resp.PublicIPAddress, nil
 }
 
 // CreateNetworkInterface creates a new network interface
-func CreateNetworkInterface(cntx context.Context, netInterfaceName, nsgName, vnetName, subnetName, ipName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName, location string) (nic network.Interface, err error) {
+func CreateNetworkInterface(cntx context.Context, netInterfaceName, nsgName, vnetName, subnetName, ipName, certPath, tenantID, clientID, certPass, subscriptionID, rgName, location string) (nic armnetwork.Interface, err error) {
 	resourceName := "network interface"
-	nsg, err := GetNetworkSecurityGroup(cntx, nsgName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName)
+	nsg, err := GetNetworkSecurityGroup(cntx, nsgName, certPath, tenantID, clientID, certPass, subscriptionID, rgName)
 	if err != nil {
 		return nic, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("failed to get netwrok security group: %v", err)))
 	}
-	subnet, err := GetVirtualNetworkSubnet(cntx, vnetName, subnetName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName)
+	subnet, err := GetVirtualNetworkSubnet(cntx, vnetName, subnetName, certPath, tenantID, clientID, certPass, subscriptionID, rgName)
 	if err != nil {
 		return nic, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("failed to get subnet: %v", err)))
 	}
-	ip, err := GetPublicIP(cntx, ipName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName)
+	ip, err := GetPublicIP(cntx, ipName, certPath, tenantID, clientID, certPass, subscriptionID, rgName)
 	if err != nil {
 		return nic, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("failed to get ip address: %v", err)))
 	}
-	nicClient := getNicClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	future, err := nicClient.CreateOrUpdate(
+	nicClient, err := getNicClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return nic, err
+	}
+	future, err := nicClient.BeginCreateOrUpdate(
 		cntx,
 		rgName,
 		netInterfaceName,
-		network.Interface{
-			Name:     to.StringPtr(netInterfaceName),
-			Location: to.StringPtr(location),
-			InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
+		armnetwork.Interface{
+			Name:     to.Ptr(netInterfaceName),
+			Location: to.Ptr(location),
+			Properties: &armnetwork.InterfacePropertiesFormat{
 				NetworkSecurityGroup: &nsg,
-				IPConfigurations: &[]network.InterfaceIPConfiguration{
+				IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
 					{
-						Name: to.StringPtr("ipConfig1"),
-						InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
+						Name: to.Ptr("ipConfig1"),
+						Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
 							Subnet:                    &subnet,
-							PrivateIPAllocationMethod: network.Dynamic,
+							PrivateIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodDynamic),
 							PublicIPAddress:           &ip,
 						},
 					},
 				},
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		return nic, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
-	err = future.WaitForCompletionRef(cntx, nicClient.Client)
+	resp, err := future.PollUntilDone(cntx, nil)
 	if err != nil {
 		return nic, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get nic create or update future response: %v", err)))
 	}
-	return future.Result(nicClient)
+	return resp.Interface, nil
 }
 
-func GetNetworkSecurityGroup(cntx context.Context, nsgName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName string) (network.SecurityGroup, error) {
-	nsgClient := getNsgClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	return nsgClient.Get(cntx, rgName, nsgName, "")
+func GetNetworkSecurityGroup(cntx context.Context, nsgName, certPath, tenantID, clientID, certPass, subscriptionID, rgName string) (armnetwork.SecurityGroup, error) {
+	nsgClient, err := getNsgClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return armnetwork.SecurityGroup{}, err
+	}
+	resp, err := nsgClient.Get(cntx, rgName, nsgName, nil)
+	if err != nil {
+		return armnetwork.SecurityGroup{}, err
+	}
+	return resp.SecurityGroup, nil
 }
 
-func GetVirtualNetworkSubnet(cntx context.Context, vnetName string, subnetName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName string) (network.Subnet, error) {
-	subnetsClient := getSubnetsClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	return subnetsClient.Get(cntx, rgName, vnetName, subnetName, "")
+func GetVirtualNetworkSubnet(cntx context.Context, vnetName string, subnetName, certPath, tenantID, clientID, certPass, subscriptionID, rgName string) (armnetwork.Subnet, error) {
+	subnetsClient, err := getSubnetsClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return armnetwork.Subnet{}, err
+	}
+	resp, err := subnetsClient.Get(cntx, rgName, vnetName, subnetName, nil)
+	if err != nil {
+		return armnetwork.Subnet{}, err
+	}
+	return resp.Subnet, nil
 }
 
-func GetPublicIP(cntx context.Context, ipName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName string) (network.PublicIPAddress, error) {
-	ipClient := getIPClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	return ipClient.Get(cntx, rgName, ipName, "")
+func GetPublicIP(cntx context.Context, ipName, certPath, tenantID, clientID, certPass, subscriptionID, rgName string) (armnetwork.PublicIPAddress, error) {
+	ipClient, err := getIPClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return armnetwork.PublicIPAddress{}, err
+	}
+	resp, err := ipClient.Get(cntx, rgName, ipName, nil)
+	if err != nil {
+		return armnetwork.PublicIPAddress{}, err
+	}
+	return resp.PublicIPAddress, nil
 }
 
-func GetNic(cntx context.Context, nicName, certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID, rgName string) (network.Interface, error) {
-	nicClient := getNicClient(certPath, tenantID, clientID, certPass, armEndpoint, subscriptionID)
-	return nicClient.Get(cntx, rgName, nicName, "")
+func GetNic(cntx context.Context, nicName, certPath, tenantID, clientID, certPass, subscriptionID, rgName string) (armnetwork.Interface, error) {
+	nicClient, err := getNicClient(certPath, tenantID, clientID, certPass, subscriptionID)
+	if err != nil {
+		return armnetwork.Interface{}, nil
+	}
+	resp, err := nicClient.Get(cntx, rgName, nicName, nil)
+	if err != nil {
+		return armnetwork.Interface{}, err
+	}
+	return resp.Interface, nil
 }

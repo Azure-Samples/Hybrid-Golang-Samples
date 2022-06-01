@@ -14,8 +14,6 @@ import (
 	hybridstorage "manageddisk/hybridStorage"
 	"manageddisk/hybridcompute"
 	"manageddisk/hybridnetwork"
-
-	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 var (
@@ -77,21 +75,14 @@ func main() {
 		log.Fatalf("Both VM admin password and SSH key pair path %s are invalid. At least one required to create VM. Usage for password authentication: go run app.go <PASSWORD>", sshPublicKeyPath)
 	}
 	cntx := context.Background()
-	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
-	splitEndpoint := strings.Split(environment.ActiveDirectoryEndpoint, "/")
-	splitEndpointlastIndex := len(splitEndpoint) - 1
-	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
-		config.TenantId = "adfs"
-	}
 
 	if len(os.Args) == 2 && os.Args[1] == "clean" {
 		fmt.Printf("Deleting resource group '%s'...\n", resourceGroupName)
 		//Create a resource group on Azure Stack
-		_, err := hybridresources.DeleteResourceGroup(
+		err := hybridresources.DeleteResourceGroup(
 			cntx,
 			resourceGroupName,
 			config.CertPath,
-			config.ResourceManagerEndpointUrl,
 			config.TenantId,
 			config.ClientId,
 			config.CertPass,
@@ -111,7 +102,6 @@ func main() {
 		resourceGroupName,
 		config.Location,
 		config.CertPath,
-		config.ResourceManagerEndpointUrl,
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
@@ -132,7 +122,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -151,7 +140,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -170,7 +158,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -193,7 +180,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -214,7 +200,6 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.CertPass,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId)
 	if errSa != nil {
 		log.Fatal(errSa.Error())
@@ -238,7 +223,6 @@ func main() {
 		config.ClientId,
 		config.CertPass,
 		config.CertPath,
-		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId)
 	if errVM != nil {
 		log.Fatal(errVM.Error())
