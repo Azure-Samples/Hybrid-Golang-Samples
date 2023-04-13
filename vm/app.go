@@ -2,36 +2,33 @@ package main
 
 import (
 	"context"
+	"crypto"
+	"crypto/x509"
 	"encoding/json"
+	"flag"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
-	"path/filepath"
 	"strings"
+	"time"
 
-	hybridresources "vm/hybridResources"
-	hybridstorage "vm/hybridStorage"
-	"vm/hybridcompute"
-	"vm/hybridnetwork"
+	"github.com/Azure/azure-sdk-for-go/profile/p20200901/resourcemanager/compute/armcompute"
+	"github.com/Azure/azure-sdk-for-go/profile/p20200901/resourcemanager/network/armnetwork"
+	"github.com/Azure/azure-sdk-for-go/profile/p20200901/resourcemanager/resources/armresources"
+	"github.com/Azure/azure-sdk-for-go/profile/p20200901/resourcemanager/storage/armstorage"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 
 	"github.com/Azure/go-autorest/autorest/azure"
 )
 
-var (
-	vmName             = "az-samples-go-vmname"
-	nicName            = "nic1"
-	username           = "VMAdmin"
-	virtualNetworkName = "vnet1"
-	subnetName         = "subnet1"
-	nsgName            = "nsg1"
-	ipName             = "ip1"
-	storageAccountName = strings.ToLower("vmsamplestacc")
-	resourceGroupName  = "azure-sample-golang-vm"
-)
-
-type AzureSecretSpConfig struct {
+type AzureSpConfig struct {
 	ClientId                   string
+	CertPass                   string
+	CertPath                   string
 	ClientSecret               string
 	ObjectId                   string
 	SubscriptionId             string
@@ -40,207 +37,569 @@ type AzureSecretSpConfig struct {
 	Location                   string
 }
 
+const (
+	publisher = "Canonical"
+	offer     = "UbuntuServer"
+	sku       = "16.04-LTS"
+)
+
 func main() {
 	// Read configuration file for Azure Stack environment details.
-	var configFile = "azureSecretSpConfig.json"
-	var configFilePath = "../" + configFile
-	_, err := os.Stat(configFilePath)
-	if err != nil {
-		log.Fatalf("The configuration file, %s, doesn't exist.", configFilePath)
+	var certConfigFile = "azureCertSpConfig.json"
+	var certConfigFilePath = "../" + certConfigFile
+	var secretConfigFile = "azureSecretSpConfig.json"
+	var secretConfigFilePath = "../" + secretConfigFile
+	var config AzureSpConfig
+	var data, certData []byte
+	var err error
+	var certs []*x509.Certificate
+	var privateKey crypto.PrivateKey
+
+	//parse flags
+	usingSecret := flag.Bool("secret", false, "use secret config file")
+	clean := flag.Bool("clean", false, "clean resource groups")
+	disableInstanceDiscovery := flag.Bool("disableID", false, "disables instance discovery")
+	flag.Parse()
+
+	if *usingSecret {
+		goto USINGSECRET
 	}
-	data, err := ioutil.ReadFile(configFilePath)
+
+	_, err = os.Stat(certConfigFilePath)
 	if err != nil {
-		log.Fatalf("Failed to read configuration file %s.", configFile)
+		goto USINGSECRET
 	}
-	var config AzureSecretSpConfig
+	data, err = os.ReadFile(certConfigFilePath)
+	if err != nil {
+		goto USINGSECRET
+	}
 	err = json.Unmarshal([]byte(data), &config)
 	if err != nil {
-		log.Fatalf("Failed to unmarshal data from %s.", configFile)
+		goto USINGSECRET
 	}
 
-	// Password is not required when using SSH key pair.
-	var password string
-	if len(os.Args) == 2 {
-		password = os.Args[1]
-	} else if len(os.Args) > 2 {
-		log.Fatalf("Error, invalid number of CLI arguments: %d", len(os.Args))
-	}
-	// The sample expects .ssh/id_rsa.pub file in home directory.
-	homeDir, err := os.UserHomeDir()
+	certData, _ = os.ReadFile(config.CertPath)
+	certs, privateKey, err = azidentity.ParseCertificates(certData, []byte(config.CertPass))
 	if err != nil {
-		log.Fatalf("Could not find user home directory. The sample code looks for .ssh folder in the user home directory %s.", homeDir)
-	}
-	sshPublicKeyPath := homeDir + filepath.FromSlash("/.ssh/id_rsa.pub")
-	_, sshPubFileErr := os.Stat(sshPublicKeyPath)
-	if sshPubFileErr != nil && len(os.Args) == 1 {
-		log.Fatalf("Both VM admin password and SSH key pair path %s are invalid. At least one required to create VM. Usage for password authentication: go run app.go <PASSWORD>", sshPublicKeyPath)
+		fmt.Println("Unable to parse Certificate")
+		goto USINGSECRET
 	}
 
+	goto USINGCERT
+
+USINGSECRET:
+	_, err = os.Stat(secretConfigFilePath)
+	if err != nil {
+		fmt.Printf("The configuration files, %s & %s, don't exist.", secretConfigFilePath, certConfigFilePath)
+		os.Exit(1)
+	}
+	data, err = os.ReadFile(secretConfigFilePath)
+	if err != nil {
+		fmt.Printf("Failed to read configuration file %s & %s.", secretConfigFile, certConfigFilePath)
+		os.Exit(1)
+	}
+
+	err = json.Unmarshal([]byte(data), &config)
+	if err != nil {
+		fmt.Printf("Failed to unmarshal data from %s & %s.", secretConfigFile, certConfigFilePath)
+		os.Exit(1)
+	}
+
+USINGCERT:
 	cntx := context.Background()
-
-	// Determine whether the environment is ADFS or AAD.
-	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
+	environment, err := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
+	if err != nil {
+		fmt.Printf("Failed to get environment from url: %s", err)
+		os.Exit(1)
+	}
 	splitEndpoint := strings.Split(environment.ActiveDirectoryEndpoint, "/")
 	splitEndpointlastIndex := len(splitEndpoint) - 1
 	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
+		*disableInstanceDiscovery = true
 		config.TenantId = "adfs"
 	}
-	storageEndpointSuffix := environment.StorageEndpointSuffix
 
-	if len(os.Args) == 2 && os.Args[1] == "clean" {
-		fmt.Printf("Deleting resource group '%s'...\n", resourceGroupName)
-		//Create a resource group on Azure Stack
-		_, err := hybridresources.DeleteResourceGroup(
-			cntx,
-			resourceGroupName,
-			config.ResourceManagerEndpointUrl,
-			config.TenantId,
-			config.ClientId,
-			config.ClientSecret,
-			config.SubscriptionId)
+	fmt.Println("Creating credential and getting token")
+
+	cloudConfig := cloud.Configuration{ActiveDirectoryAuthorityHost: environment.ActiveDirectoryEndpoint, Services: map[cloud.ServiceName]cloud.ServiceConfiguration{cloud.ResourceManager: {Endpoint: environment.ResourceManagerEndpoint, Audience: environment.TokenAudience}}}
+
+	clientOptions := policy.ClientOptions{Cloud: cloudConfig}
+
+	var cred azcore.TokenCredential
+	if *usingSecret {
+		options := azidentity.ClientSecretCredentialOptions{ClientOptions: clientOptions, DisableInstanceDiscovery: *disableInstanceDiscovery}
+		cred, err = azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, &options)
 		if err != nil {
-			log.Fatal(err.Error())
-		} else {
-			fmt.Printf("Successfully deleted resource group '%s'.\n", resourceGroupName)
+			fmt.Printf("Error getting client secret cred: %s\n", err)
+			os.Exit(1)
 		}
-		return
-	}
-
-	fmt.Printf("Creating resource group '%s'...\n", resourceGroupName)
-	//Create a resource group on Azure Stack
-	_, errRgStack := hybridresources.CreateResourceGroup(
-		cntx,
-		resourceGroupName,
-		config.Location,
-		config.ResourceManagerEndpointUrl,
-		config.TenantId,
-		config.ClientId,
-		config.ClientSecret,
-		config.SubscriptionId)
-	if errRgStack != nil {
-		log.Fatal(errRgStack.Error())
+		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.TokenAudience + "/.default"}})
 	} else {
-		fmt.Printf("Successfully created resource group '%s'.\n", resourceGroupName)
+		options := azidentity.ClientCertificateCredentialOptions{ClientOptions: clientOptions, DisableInstanceDiscovery: *disableInstanceDiscovery}
+		cred, err = azidentity.NewClientCertificateCredential(config.TenantId, config.ClientId, certs, privateKey, &options)
+		if err != nil {
+			fmt.Printf("Error getting client certificate cred: %s\n", err)
+			os.Exit(1)
+		}
+		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.TokenAudience + "/.default"}})
 	}
 
-	fmt.Printf("Creating virtual network '%s' and subnet '%s'...\n", virtualNetworkName, subnetName)
-	// Create virtual network on Azure Stack
-	_, errVnet := hybridnetwork.CreateVirtualNetworkAndSubnets(
-		cntx,
-		virtualNetworkName,
-		subnetName,
-		config.TenantId,
-		config.ClientId,
-		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
-		config.SubscriptionId,
+	if err != nil {
+		fmt.Printf("Error getting token: %s\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Creating resource group")
+
+	var resourceGroupName = "TestGoVMSampleResourceGroup"
+
+	rgoptions := arm.ClientOptions{ClientOptions: clientOptions}
+	rgClient, err := armresources.NewResourceGroupsClient(config.SubscriptionId, cred, &rgoptions)
+
+	if err != nil {
+		fmt.Printf("Error creating resource group client: %s\n", err)
+		os.Exit(1)
+	}
+
+	param := armresources.ResourceGroup{
+		Location: to.Ptr(config.Location),
+	}
+
+	_, err = rgClient.CreateOrUpdate(cntx, resourceGroupName, param, nil)
+	if err != nil {
+		fmt.Printf("\nError creating resource group: %s\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Creating a virtual network client")
+
+	vnetClient, err := armnetwork.NewVirtualNetworksClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("\nError creating vnet client: %s\n", err)
+		os.Exit(1)
+	}
+
+	//Create Vnet
+	fmt.Println("Creating Vnet and subnets")
+	var vnetName = "TestGoVnetName"
+	var subnetName = "TestGoSubnetName"
+	vnetresp, err := vnetClient.BeginCreateOrUpdate(
+		context.Background(),
 		resourceGroupName,
-		config.Location)
-	if errVnet != nil {
-		log.Fatal(errVnet.Error())
-	} else {
-		fmt.Printf("Successfully created virtual network '%s' and subnet '%s'.\n", virtualNetworkName, subnetName)
+		vnetName,
+		armnetwork.VirtualNetwork{
+			Location: to.Ptr(config.Location),
+			Properties: &armnetwork.VirtualNetworkPropertiesFormat{
+				AddressSpace: &armnetwork.AddressSpace{
+					AddressPrefixes: []*string{to.Ptr("10.0.0.0/8")},
+				},
+				Subnets: []*armnetwork.Subnet{
+					to.Ptr(armnetwork.Subnet{
+						Name: to.Ptr(subnetName),
+						Properties: &armnetwork.SubnetPropertiesFormat{
+							AddressPrefix: to.Ptr("10.0.0.0/16"),
+						},
+					}),
+				},
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		fmt.Printf("\nError creating Vnet: %s\n", err)
+	}
+	cntxTimeout, cancel := context.WithTimeout(cntx, 60*time.Second)
+	defer cancel()
+	_, err = vnetresp.PollUntilDone(cntxTimeout, nil)
+	if err != nil {
+		fmt.Printf("\nError creating Vnet: %s\n", err)
 	}
 
-	fmt.Printf("Creating network security group '%s'...\n", nsgName)
-	//Create network security group on Azure Stack
-	_, errSg := hybridnetwork.CreateNetworkSecurityGroup(
-		cntx,
+	//Create NSG
+	nsgName := "TestGoNsgName"
+	nsgclient, err := armnetwork.NewSecurityGroupsClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("\nError creating NSG client: %s\n", err)
+	}
+
+	nsgresp, err := nsgclient.BeginCreateOrUpdate(
+		context.Background(),
+		resourceGroupName,
 		nsgName,
-		config.TenantId,
-		config.ClientId,
-		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
-		config.SubscriptionId,
-		resourceGroupName,
-		config.Location)
-	if errSg != nil {
-		log.Fatal(errSg.Error())
-	} else {
-		fmt.Printf("Successfully created network security group '%s'.\n", nsgName)
+		armnetwork.SecurityGroup{
+			Location: to.Ptr(config.Location),
+			Properties: &armnetwork.SecurityGroupPropertiesFormat{
+				SecurityRules: []*armnetwork.SecurityRule{
+					&armnetwork.SecurityRule{
+						Name: to.Ptr("allow_ssh"),
+						Properties: &armnetwork.SecurityRulePropertiesFormat{
+							Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+							SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+							SourcePortRange:          to.Ptr("1-65535"),
+							DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+							DestinationPortRange:     to.Ptr("22"),
+							Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+							Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+							Priority:                 to.Ptr(int32(100)),
+						},
+					},
+					&armnetwork.SecurityRule{
+						Name: to.Ptr("allow_https"),
+						Properties: &armnetwork.SecurityRulePropertiesFormat{
+							Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+							SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+							SourcePortRange:          to.Ptr("1-65535"),
+							DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+							DestinationPortRange:     to.Ptr("443"),
+							Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+							Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+							Priority:                 to.Ptr(int32(200)),
+						},
+					},
+				},
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		fmt.Printf("Failed to create nsg: %s\n", err)
+		os.Exit(1)
+	}
+	defer cancel()
+	_, err = nsgresp.PollUntilDone(cntxTimeout, nil)
+	if err != nil {
+		fmt.Printf("\nError creating nsg: %s\n", err)
 	}
 
-	fmt.Printf("Creating public ip '%s'...\n", ipName)
-	// Create public IP on Azure Stack
-	_, errIP := hybridnetwork.CreatePublicIP(
-		cntx,
-		ipName,
-		config.TenantId,
-		config.ClientId,
-		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
-		config.SubscriptionId,
-		resourceGroupName,
-		config.Location)
-	if errIP != nil {
-		log.Fatal(errIP.Error())
-	} else {
-		fmt.Printf("Successfully created public ip '%s'.\n", ipName)
+	// Create public ip
+	fmt.Println("Creating public ip client")
+
+	ipClient, err := armnetwork.NewPublicIPAddressesClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("Failed to create public ip client: %s\n", err)
+		os.Exit(1)
 	}
 
-	fmt.Printf("Creating network interface '%s'...\n", nicName)
-	// Create network interface on Azure Stack
-	_, errNic := hybridnetwork.CreateNetworkInterface(
-		cntx,
-		nicName,
-		nsgName,
-		virtualNetworkName,
-		subnetName,
-		ipName,
-		config.TenantId,
-		config.ClientId,
-		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
-		config.SubscriptionId,
+	fmt.Println("Creating public ip")
+	var publicIpName = "TestGoIpAddr"
+	ipresp, err := ipClient.BeginCreateOrUpdate(
+		context.Background(),
 		resourceGroupName,
-		config.Location)
-	if errNic != nil {
-		log.Fatal(errNic.Error())
-	} else {
-		fmt.Printf("Successfully created network interface '%s'.\n", nicName)
+		publicIpName,
+		armnetwork.PublicIPAddress{
+			Name:     to.Ptr(publicIpName),
+			Location: to.Ptr(config.Location),
+			Properties: &armnetwork.PublicIPAddressPropertiesFormat{
+				PublicIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodStatic),
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		fmt.Printf("Failed to create public ip: %s\n", err)
+		os.Exit(1)
+	}
+	defer cancel()
+	_, err = ipresp.PollUntilDone(cntxTimeout, nil)
+	if err != nil {
+		fmt.Printf("\nError creating public ip: %s\n", err)
 	}
 
-	fmt.Printf("Creating storage account '%s'...\n", storageAccountName)
-	// Create storage account and disk on Azure Stack
-	_, errSa := hybridstorage.CreateStorageAccount(
-		cntx,
+	//Get subnet
+	fmt.Println("Create Subnet client")
+	subnetClient, err := armnetwork.NewSubnetsClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("Failed to create subnets client: %s\n", err)
+		os.Exit(1)
+	}
+
+	subresp, err := subnetClient.Get(context.Background(), resourceGroupName, vnetName, subnetName, nil)
+	if err != nil {
+		fmt.Printf("Failed to get subnet: %s\n", err)
+		os.Exit(1)
+	}
+
+	//Create a network interface
+	fmt.Println("Creating a Network Interface client")
+	niClient, err := armnetwork.NewInterfacesClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("Failed to create network interface client: %s\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Creating Network Interface")
+	var nicname = "testGoNetworkInterface"
+	nsg, _ := nsgresp.Result(context.Background())
+	pubIp, _ := ipresp.Result(context.Background())
+	nicresp, err := niClient.BeginCreateOrUpdate(
+		context.Background(),
+		resourceGroupName,
+		nicname,
+		armnetwork.Interface{
+			Name:     &nicname,
+			Location: to.Ptr(config.Location),
+			Properties: &armnetwork.InterfacePropertiesFormat{
+				NetworkSecurityGroup: &nsg.SecurityGroup,
+				IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
+					&armnetwork.InterfaceIPConfiguration{
+						Name: to.Ptr("ipConfig1"),
+						Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
+							Subnet:                    &subresp.Subnet,
+							PrivateIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodDynamic),
+							PublicIPAddress:           &pubIp.PublicIPAddress,
+						},
+					},
+				},
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		fmt.Printf("Failed to create network interface: %s\n", err)
+		os.Exit(1)
+	}
+	defer cancel()
+	_, err = nicresp.PollUntilDone(cntxTimeout, nil)
+	if err != nil {
+		fmt.Printf("\nError creating network interface: %s\n", err)
+	}
+	nicresult, _ := nicresp.Result(context.Background())
+	nic := nicresult.Interface
+
+	// Create storage acc
+	var storageAccountName = "govmteststorageacc"
+	saClient, err := armstorage.NewAccountsClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("\nErr creating storage client %s", err)
+	}
+
+	var skuname = armstorage.SKUNameStandardLRS
+
+	_, err = saClient.BeginCreate(
+		context.Background(),
+		resourceGroupName,
 		storageAccountName,
-		resourceGroupName,
-		config.Location,
-		config.TenantId,
-		config.ClientId,
-		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
-		config.SubscriptionId)
-	if errSa != nil {
-		log.Fatal(errSa.Error())
-	} else {
-		fmt.Printf("Successfully created storage account '%s'.\n", storageAccountName)
+		armstorage.AccountCreateParameters{
+			SKU:        &armstorage.SKU{Name: &skuname},
+			Location:   to.Ptr(config.Location),
+			Properties: &armstorage.AccountPropertiesCreateParameters{},
+		},
+		nil)
+
+	if err != nil {
+		fmt.Printf("\nErr creating storage account: %s", err)
+		os.Exit(1)
 	}
 
-	fmt.Printf("Creating vm '%s'...\n", vmName)
-	// Create virtual machine on Azure Stack
-	_, errVM := hybridcompute.CreateVM(cntx,
+	// Create Virtual Machine
+	var vmName = "TestGoVm1"
+	fmt.Println("Creating Virtual Machine client")
+
+	vmClient, err := armcompute.NewVirtualMachinesClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("\nErr creating vm client: %s", err)
+		os.Exit(1)
+	}
+
+	// Create Profiles
+	hardwareProfile := &armcompute.HardwareProfile{
+		VMSize: to.Ptr(armcompute.VirtualMachineSizeTypesStandardA1),
+	}
+
+	vhdURItemplate := "https://%s.blob." + environment.StorageEndpointSuffix + "/vhds/%s.vhd"
+	storageProfile := &armcompute.StorageProfile{
+		ImageReference: &armcompute.ImageReference{
+			Publisher: to.Ptr(publisher),
+			Offer:     to.Ptr(offer),
+			SKU:       to.Ptr(sku),
+			Version:   to.Ptr("latest"),
+		},
+		OSDisk: &armcompute.OSDisk{
+			Name: to.Ptr("osDisk"),
+			Vhd: &armcompute.VirtualHardDisk{
+				URI: to.Ptr(fmt.Sprintf(vhdURItemplate, storageAccountName, vmName)),
+			},
+			CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesFromImage),
+		},
+	}
+
+	osProfile := &armcompute.OSProfile{
+		ComputerName:  to.Ptr(vmName),
+		AdminUsername: to.Ptr("username"),
+		AdminPassword: to.Ptr("Password!23"),
+	}
+
+	networkProfile := &armcompute.NetworkProfile{
+		NetworkInterfaces: []*armcompute.NetworkInterfaceReference{
+			&armcompute.NetworkInterfaceReference{
+				ID: nic.ID,
+				Properties: &armcompute.NetworkInterfaceReferenceProperties{
+					Primary: to.Ptr(true),
+				},
+			},
+		},
+	}
+
+	fmt.Println("Creating Virtual Machine")
+	_, err = vmClient.BeginCreateOrUpdate(
+		context.Background(),
+		resourceGroupName,
 		vmName,
-		nicName,
-		username,
-		password,
-		storageAccountName,
-		sshPublicKeyPath,
-		resourceGroupName,
-		config.Location,
-		config.TenantId,
-		config.ClientId,
-		config.ClientSecret,
-		config.ResourceManagerEndpointUrl,
-		config.SubscriptionId,
-		storageEndpointSuffix)
-	if errVM != nil {
-		log.Fatal(errVM.Error())
-	} else {
-		fmt.Printf("Successfully created vm '%s'.\n", vmName)
-		fmt.Printf("Sample completed successfully.\n")
+		armcompute.VirtualMachine{
+			Location: to.Ptr(config.Location),
+			Properties: &armcompute.VirtualMachineProperties{
+				HardwareProfile: hardwareProfile,
+				OSProfile:       osProfile,
+				NetworkProfile:  networkProfile,
+				StorageProfile:  storageProfile,
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		fmt.Printf("\nErr creating vm: %s", err)
+		os.Exit(1)
 	}
 
-	return
+	fmt.Printf("Listing virtual machines in %s\n", resourceGroupName)
+	pager := vmClient.NewListPager(resourceGroupName, nil)
+	for pager.More() {
+		resp, err := pager.NextPage(context.Background())
+		if err != nil {
+			fmt.Printf("\nErr can't get next page in vm list")
+			os.Exit(1)
+		}
+		if resp.VirtualMachineListResult.Value != nil {
+			for _, vm := range resp.VirtualMachineListResult.Value {
+				fmt.Print(*vm.Name + ", ")
+			}
+		}
+	}
+	fmt.Println()
+
+	fmt.Println("Deleting VM")
+	delResp, _ := vmClient.BeginDelete(context.Background(), resourceGroupName, vmName, nil)
+	cntxTimeoutDel, cancel := context.WithTimeout(cntx, 500*time.Second)
+	defer cancel()
+	_, err = delResp.PollUntilDone(cntxTimeoutDel, nil)
+	if err != nil {
+		fmt.Printf("\nError deleting vm: %s\n", err)
+	}
+
+	//Managed disk vm
+	fmt.Println("Creating Disk client")
+	diskClient, err := armcompute.NewDisksClient(config.SubscriptionId, cred, &rgoptions)
+	if err != nil {
+		fmt.Printf("\nErr creating disk client: %s", err)
+		os.Exit(1)
+	}
+	var diskName = "osDisk2"
+	var vmNameMD = "TestGoManagedDiskVm"
+	fmt.Println("Creating Disk")
+	diskResp, _ := diskClient.BeginCreateOrUpdate(
+		context.Background(),
+		resourceGroupName,
+		diskName,
+		armcompute.Disk{
+			Location: to.Ptr(config.Location),
+			Properties: &armcompute.DiskProperties{
+				CreationData: &armcompute.CreationData{
+					CreateOption: to.Ptr(armcompute.DiskCreateOptionEmpty),
+				},
+				DiskSizeGB: to.Ptr(int32(1)),
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		fmt.Printf("\nErr creating disk: %s", err)
+		os.Exit(1)
+	}
+	defer cancel()
+	_, err = diskResp.PollUntilDone(cntxTimeout, nil)
+	if err != nil {
+		fmt.Printf("\nError creating disk: %s\n", err)
+	}
+	diskresult, _ := diskResp.Result(context.Background())
+	disk := diskresult.Disk
+
+	storageProfileManagedDisk := &armcompute.StorageProfile{
+		ImageReference: &armcompute.ImageReference{
+			Publisher: to.Ptr(publisher),
+			Offer:     to.Ptr(offer),
+			SKU:       to.Ptr(sku),
+			Version:   to.Ptr("latest"),
+		},
+		DataDisks: []*armcompute.DataDisk{
+			&armcompute.DataDisk{
+				CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesAttach),
+				ManagedDisk: &armcompute.ManagedDiskParameters{
+					StorageAccountType: to.Ptr(armcompute.StorageAccountTypesStandardLRS),
+					ID:                 disk.ID,
+				},
+				Caching:    to.Ptr(armcompute.CachingTypesReadOnly),
+				DiskSizeGB: to.Ptr(int32(1)),
+				Lun:        to.Ptr(int32(1)),
+				Name:       to.Ptr(diskName),
+			},
+		},
+		OSDisk: &armcompute.OSDisk{
+			Name:         to.Ptr("osDiskMD"),
+			CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesFromImage),
+		},
+	}
+
+	fmt.Println("Creating Managed Disk VM")
+	_, err = vmClient.BeginCreateOrUpdate(
+		context.Background(),
+		resourceGroupName,
+		vmNameMD,
+		armcompute.VirtualMachine{
+			Location: to.Ptr(config.Location),
+			Properties: &armcompute.VirtualMachineProperties{
+				HardwareProfile: hardwareProfile,
+				OSProfile:       osProfile,
+				NetworkProfile:  networkProfile,
+				StorageProfile:  storageProfileManagedDisk,
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		fmt.Printf("\nErr creating managed disk vm: %s", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Listing virtual machines in %s\n", resourceGroupName)
+	pager = vmClient.NewListPager(resourceGroupName, nil)
+	for pager.More() {
+		resp, err := pager.NextPage(context.Background())
+		if err != nil {
+			fmt.Printf("\nErr can't get next page in vm list")
+			os.Exit(1)
+		}
+		if resp.VirtualMachineListResult.Value != nil {
+			for _, vm := range resp.VirtualMachineListResult.Value {
+				fmt.Print(*vm.Name + ", ")
+			}
+		}
+	}
+	fmt.Println()
+
+	if *clean {
+		fmt.Println("Deleting resource group")
+		result, err := rgClient.BeginDelete(context.Background(), resourceGroupName, nil)
+		if err != nil {
+			fmt.Printf("Failed to delete resource group: %s\n", resourceGroupName)
+			os.Exit(1)
+		}
+
+		cntxTimeout, cancel = context.WithTimeout(cntx, 500*time.Second)
+		defer cancel()
+		_, err = result.PollUntilDone(cntxTimeout, nil)
+		if err != nil {
+			fmt.Println("Timed out when deleting resource group")
+			os.Exit(1)
+		}
+	}
 }
