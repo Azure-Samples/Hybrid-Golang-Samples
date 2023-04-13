@@ -2,10 +2,10 @@
 
 The code provided shows how to do the following:
 
+- Create a Client Secret Credential
 - Create a resource group
-- Create a storage account
-- Create a container in the storage account
-- Upload a file to the container
+- List resource groups
+- Delete a resource group
 
 To see the code to perform these operations,
 check out the `main()` function in [app.go](app.go).
@@ -15,22 +15,19 @@ check out the `main()` function in [app.go](app.go).
 
 1.  Open a Powershell or Bash shell in `...\Hybrid-Golang-Samples\dataplane` and enter the following commands:
     ```
-    go mod init dataplane
     go mod tidy
-    go get github.com/Azure/azure-storage-blob-go/azblob@v0.10.0
     ```
-
-    NOTE: The azblob@v0.10.0 version is required for AzureStack.
 
 1. Run the sample.
     ```
-    go run app.go
+    go run app.go [-secret] [-clean] [-disableID]
     ```
 
-1. Clean the resource group created during sample run.
-    ```
-    go run app.go clean
-    ```
+    -clean deletes the resource group created during the run
+
+    -secret uses the secret config file
+
+    -disableID disables instance discovery
 
 ## More information
 
