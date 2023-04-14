@@ -188,7 +188,7 @@ USINGCERT:
 	printResourceGroups(rgClient)
 
 	if *clean {
-		fmt.Println("Deleting resource group\n")
+		fmt.Println("Deleting resource group")
 		result, err := rgClient.BeginDelete(context.Background(), resourceGroupName, nil)
 		if err != nil {
 			fmt.Printf("Failed to delete resource group: %s\n", resourceGroupName)
