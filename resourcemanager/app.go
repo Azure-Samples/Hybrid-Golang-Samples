@@ -76,7 +76,7 @@ func main() {
 	}
 
 	certData, err = ioutil.ReadFile(config.CertPath)
-	certs, privateKey, err = azidentity.ParseCertificates(certData, byte[](config.CertPass))
+	certs, privateKey, err = azidentity.ParseCertificates(certData, []byte(config.CertPass))
 	if err != nil {
 		fmt.Println("Unable to parse Certificate")
 		goto USINGSECRET
