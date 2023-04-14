@@ -76,7 +76,7 @@ func main() {
 	}
 
 	certData, err = ioutil.ReadFile(config.CertPath)
-	certs, privateKey, err = azidentity.ParseCertificates(certData, config.CertPass)
+	certs, privateKey, err = azidentity.ParseCertificates(certData, byte[](config.CertPass))
 	if err != nil {
 		fmt.Println("Unable to parse Certificate")
 		goto USINGSECRET
@@ -113,7 +113,7 @@ USINGCERT:
 
 	fmt.Println("Creating credential and getting token")
 
-	cloudConfig := cloud.Configuration{ActiveDirectoryAuthorityHost: environment.ActiveDirectoryAuthorityHost, Services: map[cloud.ServiceName]cloud.ServiceConfiguration{cloud.ResourceManager: {Endpoint: environment.ResourceManagerEndpointUrl, Audience: environment.ResourceManagerEndpointUrl}}}
+	cloudConfig := cloud.Configuration{ActiveDirectoryAuthorityHost: environment.ActiveDirectoryEndpoint, Services: map[cloud.ServiceName]cloud.ServiceConfiguration{cloud.ResourceManager: {Endpoint: environment.ResourceManagerEndpoint, Audience: environment.ResourceManagerEndpoint}}}
 
 	clientOptions := policy.ClientOptions{Cloud: cloudConfig}
 
@@ -125,7 +125,7 @@ USINGCERT:
 			fmt.Printf("Error getting client secret cred: %s\n", err)
 			os.Exit(1)
 		}
-		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.ResourceManagerEndpointUrl + "/.default"}})
+		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.ResourceManagerEndpoint + "/.default"}})
 	} else {
 		options := azidentity.ClientCertificateCredentialOptions{ClientOptions: clientOptions, DisableInstanceDiscovery: *disableInstanceDiscovery}
 		cred, err = azidentity.NewClientCertificateCredential(config.TenantId, config.ClientId, certs, privateKey, &options)
@@ -133,7 +133,7 @@ USINGCERT:
 			fmt.Printf("Error getting client certificate cred: %s\n", err)
 			os.Exit(1)
 		}
-		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.ResourceManagerEndpointUrl + "/.default"}})
+		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.ResourceManagerEndpoint + "/.default"}})
 	}
 
 	if err != nil {
