@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
@@ -22,12 +23,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 )
 
-var (
-	storageAccountName   = "samplestacc"
-	resourceGroupName    = "azure-sample-golang-dataplane"
-	storageContainerName = "samplecontainer"
-)
-
 type AzureSpConfig struct {
 	ClientId                   string
 	CertPass                   string
@@ -38,6 +33,23 @@ type AzureSpConfig struct {
 	TenantId                   string
 	ResourceManagerEndpointUrl string
 	Location                   string
+}
+
+func printResourceGroups(rgClient *armresources.ResourceGroupsClient) {
+	pager := rgClient.NewListPager(nil)
+	for pager.More() {
+		resp, err := pager.NextPage(context.Background())
+		if err != nil {
+			fmt.Printf("\nErr can't get next page in resource group list")
+			os.Exit(1)
+		}
+		if resp.ResourceGroupListResult.Value != nil {
+			for _, rg := range resp.ResourceGroupListResult.Value {
+				fmt.Print(*rg.Name + ", ")
+			}
+		}
+	}
+	fmt.Println()
 }
 
 func main() {
@@ -75,7 +87,7 @@ func main() {
 		goto USINGSECRET
 	}
 
-	certData, err = ioutil.ReadFile(config.CertPath)
+	certData, _ = ioutil.ReadFile(config.CertPath)
 	certs, privateKey, err = azidentity.ParseCertificates(certData, []byte(config.CertPass))
 	if err != nil {
 		fmt.Println("Unable to parse Certificate")
@@ -173,27 +185,24 @@ USINGCERT:
 	//print RGs
 	// List all the resource groups of an Azure subscription.
 	fmt.Println("Listing Resource Groups")
-	pager := rgClient.NewListPager(nil)
-	for pager.More() {
-		resp, err := pager.NextPage(context.Background())
-		if err != nil {
-			fmt.Printf("\nErr can't get next page in resource group list")
-			os.Exit(1)
-		}
-		if resp.ResourceGroupListResult.Value != nil {
-			for _, rg := range resp.ResourceGroupListResult.Value {
-				fmt.Print(*rg.Name + ", ")
-			}
-		}
-	}
+	printResourceGroups(rgClient)
 
 	if *clean {
-		_, err = rgClient.BeginDelete(context.Background(), resourceGroupName, nil)
+		fmt.Println("Deleting resource group\n")
+		result, err := rgClient.BeginDelete(context.Background(), resourceGroupName, nil)
 		if err != nil {
 			fmt.Printf("Failed to delete resource group: %s\n", resourceGroupName)
 			os.Exit(1)
 		}
-	}
 
-	return
+		cntxTimeout, cancel := context.WithTimeout(cntx, 300*time.Second)
+		defer cancel()
+		_, err = result.PollUntilDone(cntxTimeout, nil)
+		if err != nil {
+			fmt.Println("Timed out when deleting resource group")
+			os.Exit(1)
+		}
+		fmt.Println("Listing Resource Groups")
+		printResourceGroups(rgClient)
+	}
 }
