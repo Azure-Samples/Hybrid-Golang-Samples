@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/profile/p20200901/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -32,23 +33,6 @@ type AzureSpConfig struct {
 	TenantId                   string
 	ResourceManagerEndpointUrl string
 	Location                   string
-}
-
-func printResourceGroups(rgClient *armresources.ResourceGroupsClient) {
-	pager := rgClient.NewListPager(nil)
-	for pager.More() {
-		resp, err := pager.NextPage(context.Background())
-		if err != nil {
-			fmt.Printf("\nErr can't get next page in resource group list")
-			os.Exit(1)
-		}
-		if resp.ResourceGroupListResult.Value != nil {
-			for _, rg := range resp.ResourceGroupListResult.Value {
-				fmt.Print(*rg.Name + ", ")
-			}
-		}
-	}
-	fmt.Println()
 }
 
 func main() {
@@ -154,7 +138,7 @@ USINGCERT:
 
 	fmt.Println("Creating resource group")
 
-	var resourceGroupName = "TestGoSampleResourceGroup"
+	var resourceGroupName = "TestGoStorageSampleResourceGroup"
 
 	rgoptions := arm.ClientOptions{ClientOptions: clientOptions}
 	rgClient, err := armresources.NewResourceGroupsClient(config.SubscriptionId, cred, &rgoptions)
@@ -175,16 +159,21 @@ USINGCERT:
 		os.Exit(1)
 	}
 
-	_, err = rgClient.Get(cntx, resourceGroupName, nil)
+	sgClient, err := armstorage.NewAccountsClient(config.SubscriptionId, cred, nil)
 	if err != nil {
-		fmt.Printf("\nErrr no resource group found: %s", err)
-		os.Exit(1)
+		fmt.Printf("\nErr creating storage client %s", err)
 	}
 
-	//print RGs
-	// List all the resource groups of an Azure subscription.
-	fmt.Println("Listing Resource Groups")
-	printResourceGroups(rgClient)
+	var badStorageAccountName = "badstorageacc"
+	//var storageAccountName = "teststorageacc"
+	availability, err := sgClient.CheckNameAvailability(context.Background(), armstorage.AccountCheckNameAvailabilityParameters{Name: &badStorageAccountName}, nil)
+	if err != nil {
+		fmt.Printf("\nErr checking storage account name availability: %s", err)
+		os.Exit(1)
+	}
+	fmt.Printf("The account %s is available: %t\n", badStorageAccountName, *availability.NameAvailable)
+	fmt.Printf("Reason: %s\n", *availability.Reason)
+	fmt.Printf("Detailed message: %s\n", *availability.Message)
 
 	if *clean {
 		fmt.Println("Deleting resource group")
@@ -201,7 +190,5 @@ USINGCERT:
 			fmt.Println("Timed out when deleting resource group")
 			os.Exit(1)
 		}
-		fmt.Println("Listing Resource Groups")
-		printResourceGroups(rgClient)
 	}
 }

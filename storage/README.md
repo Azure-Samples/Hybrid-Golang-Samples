@@ -4,7 +4,13 @@ The code provided shows how to do the following:
 
 - Create a Client Secret Credential
 - Create a resource group
-- List resource groups
+- Check storage account name availability
+- Create a storage account
+- List storage accounts
+- List storage accounts by resource group
+- Get storage account key
+- Regenerate storage account key
+- Delete storage account
 - Delete a resource group
 
 To see the code to perform these operations,
