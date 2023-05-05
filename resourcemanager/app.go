@@ -124,7 +124,7 @@ USINGCERT:
 
 	fmt.Println("Creating credential and getting token")
 
-	cloudConfig := cloud.Configuration{ActiveDirectoryAuthorityHost: environment.ActiveDirectoryEndpoint, Services: map[cloud.ServiceName]cloud.ServiceConfiguration{cloud.ResourceManager: {Endpoint: environment.ResourceManagerEndpoint, Audience: environment.ResourceManagerEndpoint}}}
+	cloudConfig := cloud.Configuration{ActiveDirectoryAuthorityHost: environment.ActiveDirectoryEndpoint, Services: map[cloud.ServiceName]cloud.ServiceConfiguration{cloud.ResourceManager: {Endpoint: environment.ResourceManagerEndpoint, Audience: environment.TokenAudience}}}
 
 	clientOptions := policy.ClientOptions{Cloud: cloudConfig}
 
@@ -136,7 +136,7 @@ USINGCERT:
 			fmt.Printf("Error getting client secret cred: %s\n", err)
 			os.Exit(1)
 		}
-		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.ResourceManagerEndpoint + "/.default"}})
+		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.TokenAudience + "/.default"}})
 	} else {
 		options := azidentity.ClientCertificateCredentialOptions{ClientOptions: clientOptions, DisableInstanceDiscovery: *disableInstanceDiscovery}
 		cred, err = azidentity.NewClientCertificateCredential(config.TenantId, config.ClientId, certs, privateKey, &options)
@@ -144,7 +144,7 @@ USINGCERT:
 			fmt.Printf("Error getting client certificate cred: %s\n", err)
 			os.Exit(1)
 		}
-		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.ResourceManagerEndpoint + "/.default"}})
+		_, err = cred.GetToken(cntx, policy.TokenRequestOptions{Scopes: []string{environment.TokenAudience + "/.default"}})
 	}
 
 	if err != nil {

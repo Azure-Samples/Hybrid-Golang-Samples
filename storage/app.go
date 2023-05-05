@@ -48,9 +48,9 @@ func main() {
 	var privateKey crypto.PrivateKey
 
 	//parse flags
-	usingSecret := flag.Bool("secret", true, "use secret config file")
-	clean := flag.Bool("clean", true, "clean resource groups")
-	disableInstanceDiscovery := flag.Bool("disableID", true, "disables instance discovery")
+	usingSecret := flag.Bool("secret", false, "use secret config file")
+	clean := flag.Bool("clean", false, "clean resource groups")
+	disableInstanceDiscovery := flag.Bool("disableID", false, "disables instance discovery")
 	flag.Parse()
 
 	if *usingSecret {
