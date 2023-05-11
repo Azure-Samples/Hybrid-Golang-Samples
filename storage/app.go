@@ -104,6 +104,7 @@ USINGCERT:
 	splitEndpointlastIndex := len(splitEndpoint) - 1
 	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
 		config.TenantId = "adfs"
+		*disableInstanceDiscovery = true
 	}
 
 	fmt.Println("Creating credential and getting token")
