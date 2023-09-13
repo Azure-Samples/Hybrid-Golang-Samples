@@ -31,13 +31,13 @@ var (
 )
 
 type AzureSecretSpConfig struct {
-	ClientId           string
-	ClientSecret       string
-	ClientObjectId     string
-	SubscriptionId     string
-	TenantId           string
-	ResourceManagerUrl string
-	Location           string
+	ClientId                   string
+	ClientSecret               string
+	ObjectId                   string
+	SubscriptionId             string
+	TenantId                   string
+	ResourceManagerEndpointUrl string
+	Location                   string
 }
 
 func main() {
@@ -79,7 +79,7 @@ func main() {
 	cntx := context.Background()
 
 	// Determine whether the environment is ADFS or AAD.
-	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerUrl)
+	environment, _ := azure.EnvironmentFromURL(config.ResourceManagerEndpointUrl)
 	splitEndpoint := strings.Split(environment.ActiveDirectoryEndpoint, "/")
 	splitEndpointlastIndex := len(splitEndpoint) - 1
 	if splitEndpoint[splitEndpointlastIndex] == "adfs" || splitEndpoint[splitEndpointlastIndex] == "adfs/" {
@@ -93,7 +93,7 @@ func main() {
 		_, err := hybridresources.DeleteResourceGroup(
 			cntx,
 			resourceGroupName,
-			config.ResourceManagerUrl,
+			config.ResourceManagerEndpointUrl,
 			config.TenantId,
 			config.ClientId,
 			config.ClientSecret,
@@ -112,7 +112,7 @@ func main() {
 		cntx,
 		resourceGroupName,
 		config.Location,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
@@ -132,7 +132,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -150,7 +150,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -168,7 +168,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -190,7 +190,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		resourceGroupName,
 		config.Location)
@@ -210,7 +210,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId)
 	if errSa != nil {
 		log.Fatal(errSa.Error())
@@ -232,7 +232,7 @@ func main() {
 		config.TenantId,
 		config.ClientId,
 		config.ClientSecret,
-		config.ResourceManagerUrl,
+		config.ResourceManagerEndpointUrl,
 		config.SubscriptionId,
 		storageEndpointSuffix)
 	if errVM != nil {
