@@ -29,6 +29,8 @@ Create a [service principal](https://docs.microsoft.com/en-us/azure/azure-stack/
 Some of the configuration parameters from service principal objects may not be used in the samples. The configuration file includes them anyway for thoroughness and future-proofing.
 
 ### Setup Secret Service Principal
+1. Rename `azureAppSpConfig.json.dist` and `azureCertSpConfig.json.dist` to `azureAppSpConfig.json` and `azureCertSpConfig.json`.
+1. Fill in the following values in the corresponding JSON files:
 
 Set the following JSON properties in `./azureAppSpConfig.json`.
 
@@ -44,7 +46,7 @@ Set the following JSON properties in `./azureAppSpConfig.json`.
 
 ### Setup Certificate Service Principal 
 
-The certificate service principal will be similar in output to secret service principal, except it uses `azureCertSpConfig.json` config file.
+The certificate service principal will be similar in output to secret service principal, except it uses `./azureCertSpConfig.json` config file.
 
 | Variable              | Description                                                 |
 |-----------------------|-------------------------------------------------------------|
