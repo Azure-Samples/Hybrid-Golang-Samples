@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"log"
 
-	"../iam"
+	"Hybrid-Compute-Go-Create-VM/iam"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/network/mgmt/network"
+	"github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -101,7 +101,7 @@ func CreateVirtualNetworkAndSubnets(cntx context.Context, vnetName, subnetName, 
 		return vnet, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
 
-	err = future.WaitForCompletion(cntx, vnetClient.Client)
+	err = future.WaitForCompletionRef(cntx, vnetClient.Client)
 	if err != nil {
 		return vnet, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get the vnet create or update future response: %v", err)))
 	}
@@ -156,7 +156,7 @@ func CreateNetworkSecurityGroup(cntx context.Context, nsgName, tenantID, clientI
 		return nsg, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
 
-	err = future.WaitForCompletion(cntx, nsgClient.Client)
+	err = future.WaitForCompletionRef(cntx, nsgClient.Client)
 	if err != nil {
 		return nsg, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get nsg create or update future response: %v", err)))
 	}
@@ -185,7 +185,7 @@ func CreatePublicIP(cntx context.Context, ipName, tenantID, clientID, clientSecr
 		return ip, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
 
-	err = future.WaitForCompletion(cntx, ipClient.Client)
+	err = future.WaitForCompletionRef(cntx, ipClient.Client)
 	if err != nil {
 		return ip, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get public ip address create or update future response: %v", err)))
 	}
@@ -221,7 +221,7 @@ func CreateNetworkInterface(cntx context.Context, netInterfaceName, nsgName, vne
 					{
 						Name: to.StringPtr("ipConfig1"),
 						InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
-							Subnet: &subnet,
+							Subnet:                    &subnet,
 							PrivateIPAllocationMethod: network.Dynamic,
 							PublicIPAddress:           &ip,
 						},
@@ -233,7 +233,7 @@ func CreateNetworkInterface(cntx context.Context, netInterfaceName, nsgName, vne
 	if err != nil {
 		return nic, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, err))
 	}
-	err = future.WaitForCompletion(cntx, nicClient.Client)
+	err = future.WaitForCompletionRef(cntx, nicClient.Client)
 	if err != nil {
 		return nic, fmt.Errorf(fmt.Sprintf(errorPrefix, resourceName, fmt.Sprintf("cannot get nic create or update future response: %v", err)))
 	}
