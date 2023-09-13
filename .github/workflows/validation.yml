@@ -19,12 +19,15 @@ jobs:
   Prepare_CI:
     runs-on: org
     steps:
-      - name: Resolve environment and samples.
-        id: resolve_environment_and_samples
+      - name: Prepare ci and process inputs.
+        id: prepare_ci_and_input
         shell: pwsh
         run: |
           Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
           $config = Import-ConfigFile
+
+          Update-CIFiles -GithubAppId $config.githubAppId `
+            -RSAPrivateKeyFilePath (Resolve-PathExpression -UnresolvedPath $config.rsaPrivateKeyFilePath)
 
           # Get a random AAD and ADFS environment
           $inputIdProvider = "${{ github.event.inputs.identity_provider }}" 
@@ -55,8 +58,8 @@ jobs:
           echo "::set-output name=INPUT_JSON_ARRAY::${inputJsonArrayString}"
 
     outputs:
-      ENVIRONMENT_JSON_ARRAY: ${{ steps.resolve_environment_and_samples.outputs.ENVIRONMENT_JSON_ARRAY }}
-      INPUT_JSON_ARRAY: ${{ steps.resolve_environment_and_samples.outputs.INPUT_JSON_ARRAY }}
+      ENVIRONMENT_JSON_ARRAY: ${{ steps.prepare_ci_and_input.outputs.ENVIRONMENT_JSON_ARRAY }}
+      INPUT_JSON_ARRAY: ${{ steps.prepare_ci_and_input.outputs.INPUT_JSON_ARRAY }}
 
   Samples_CI:
     runs-on: org
