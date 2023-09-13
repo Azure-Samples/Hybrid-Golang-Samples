@@ -26,9 +26,6 @@ jobs:
           Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
           $config = Import-ConfigFile
 
-          Update-CIFiles -GithubAppId $config.githubAppId `
-            -RSAPrivateKeyFilePath (Resolve-PathExpression -UnresolvedPath $config.rsaPrivateKeyFilePath)
-
           # Get a random AAD and ADFS environment
           $inputIdProvider = "${{ github.event.inputs.identity_provider }}" 
           $environmentJsonArray = Resolve-IdProviderToEnvironmentJSONArray -Config $config -InputIdentityProvider $inputIdProvider
@@ -79,10 +76,27 @@ jobs:
       - name: Run Azure Stack SDK Samples.
         shell: pwsh
         run: |
+          # Import static CI repo common module containing updater code.
           Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
           $config = Import-ConfigFile
 
-          Write-Host -Message "Current workspace: ${{ github.workspace }}"
-          & "$($env:AZURESTACK_SDK_CI_REPO)\invoke-samplesinparallel.ps1" -Sample "${{ matrix.INPUT_JSON_ARRAY }}" `
+          # Clone latest version of CI repo.
+          $githubWorkspace = "${{ github.workspace }}"
+          $githubWorkspaceParent = Split-Path -Path $githubWorkspace
+          $ciRepoPath = "${githubWorkspaceParent}\ci-repo"
+          Write-Host -Message "Updating CI files at ${ciRepoPath}."
+          Update-CIFiles -GithubAppId $config.githubAppId `
+            -RSAPrivateKeyFilePath (Resolve-PathExpression -UnresolvedPath $config.rsaPrivateKeyFilePath) `
+            -CIRepoPath $ciRepoPath
+          Write-Host -Message "Finished updating CI files at ${ciRepoPath}:"
+          Get-ChildItem -Path $ciRepoPath
+
+          # Remove old common module and import the recently cloned common module.
+          Remove-Module -Name common
+          Import-Module ([System.IO.Path]::Combine($ciRepoPath,"common.psm1"))
+          $config = Import-ConfigFile
+          
+          Write-Host -Message "Current workspace: $githubWorkspace"
+          & "${ciRepoPath}\invoke-samplesinparallel.ps1" -Sample "${{ matrix.INPUT_JSON_ARRAY }}" `
             -EnvironmentName "${{ matrix.ENVIRONMENT_JSON_ARRAY }}" `
-            -SamplesPath "${{ github.workspace }}"
+            -SamplesRootPath $githubWorkspace
