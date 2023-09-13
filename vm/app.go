@@ -26,7 +26,7 @@ var (
 	subnetName         = "subnet1"
 	nsgName            = "nsg1"
 	ipName             = "ip1"
-	storageAccountName = strings.ToLower("samplestacc")
+	storageAccountName = strings.ToLower("vmsamplestacc")
 	resourceGroupName  = "azure-sample-golang-vm"
 )
 
