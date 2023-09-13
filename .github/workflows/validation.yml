@@ -19,11 +19,6 @@ jobs:
   Prepare_CI:
     runs-on: org
     steps:
-      - name: Checkout ${{ github.repository }}.
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.ref }}
-
       - name: Resolve environment and samples.
         id: resolve_environment_and_samples
         shell: pwsh
@@ -72,11 +67,6 @@ jobs:
         ENVIRONMENT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.ENVIRONMENT_JSON_ARRAY) }}
         INPUT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.INPUT_JSON_ARRAY) }}
     steps:
-      - name: Checkout ${{ github.repository }}.
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.ref }}
-
       - name: Log in with Azure.
         uses: azure/login@v1
         with:
@@ -89,30 +79,7 @@ jobs:
           Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
           $config = Import-ConfigFile
 
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
-          $clonedFolderName =  "${{ matrix.ENVIRONMENT_JSON_ARRAY }}-${{ matrix.INPUT_JSON_ARRAY }}" -replace ":","-"
-          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", "hybrid-golang-samples", "run${{ github.run_id }}", $clonedFolderName)
-          if ((Test-Path -Path $samplesPath))
-          {
-            Remove-Item -Path $samplesPath -Force -Recurse
-          }
+          Write-Host -Message "Current workspace: ${{ github.workspace }}"
           & "$($env:AZURESTACK_SDK_CI_REPO)\invoke-samplesinparallel.ps1" -Sample "${{ matrix.INPUT_JSON_ARRAY }}" `
             -EnvironmentName "${{ matrix.ENVIRONMENT_JSON_ARRAY }}" `
-            -SamplesPath $samplesPath
-
-  Cleanup:
-    runs-on: org
-    needs: Samples_CI
-    if: always()
-    steps:
-      - name: Clean up samples.
-        if: always()
-        shell: pwsh
-        run: |
-          Import-Module ([System.IO.Path]::Combine($env:AZURESTACK_SDK_CI_REPO,"common.psm1"))
-          $config = Import-ConfigFile
-          $samplesPath = [System.IO.Path]::Combine($config.supplementaryWorkspace, "samples", "hybrid-golang-samples", "run${{ github.run_id }}")
-          if ((Test-Path -Path $samplesPath))
-          {
-            Remove-Item -Path $samplesPath -Force -Recurse
-          }
+            -SamplesPath "${{ github.workspace }}"
