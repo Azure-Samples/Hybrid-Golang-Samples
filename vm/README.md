@@ -21,13 +21,15 @@ Each operation is clearly labeled with a comment and a print function.
 
 ## Running this sample
 
-1.  Open a Powershell or Bash shell in `...\Hybrid-Golang-Samples\keyvault` and enter the following commands:
-    ```
+1. Open a Powershell or Bash shell in `...\Hybrid-Golang-Samples\keyvault` and enter the following commands:
+
+    ```powershell
     go mod tidy
     ```
 
 1. Run the sample.
-    ```
+
+    ```powershell
     go run app.go [-secret] [-clean] [-disableID]
     ```
 

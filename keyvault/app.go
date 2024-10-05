@@ -219,8 +219,8 @@ USINGCERT:
 					Family: &skuFamily,
 					Name:   &skuname,
 				},
-				AccessPolicies: []*armkeyvault.AccessPolicyEntry{&armkeyvault.AccessPolicyEntry{
-					ObjectID: to.Ptr("testgoobjectid"),
+				AccessPolicies: []*armkeyvault.AccessPolicyEntry{{
+					ObjectID: to.Ptr(config.ObjectId),
 					TenantID: &adminTenantId,
 					Permissions: &armkeyvault.Permissions{
 						Secrets:      []*armkeyvault.SecretPermissions{to.Ptr(armkeyvault.SecretPermissionsAll)},
