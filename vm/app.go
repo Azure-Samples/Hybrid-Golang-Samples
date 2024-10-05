@@ -230,7 +230,7 @@ USINGCERT:
 			Location: to.Ptr(config.Location),
 			Properties: &armnetwork.SecurityGroupPropertiesFormat{
 				SecurityRules: []*armnetwork.SecurityRule{
-					&armnetwork.SecurityRule{
+					{
 						Name: to.Ptr("allow_ssh"),
 						Properties: &armnetwork.SecurityRulePropertiesFormat{
 							Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
@@ -243,7 +243,7 @@ USINGCERT:
 							Priority:                 to.Ptr(int32(100)),
 						},
 					},
-					&armnetwork.SecurityRule{
+					{
 						Name: to.Ptr("allow_https"),
 						Properties: &armnetwork.SecurityRulePropertiesFormat{
 							Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
@@ -341,7 +341,7 @@ USINGCERT:
 			Properties: &armnetwork.InterfacePropertiesFormat{
 				NetworkSecurityGroup: &nsg.SecurityGroup,
 				IPConfigurations: []*armnetwork.InterfaceIPConfiguration{
-					&armnetwork.InterfaceIPConfiguration{
+					{
 						Name: to.Ptr("ipConfig1"),
 						Properties: &armnetwork.InterfaceIPConfigurationPropertiesFormat{
 							Subnet:                    &subresp.Subnet,
@@ -431,7 +431,7 @@ USINGCERT:
 
 	networkProfile := &armcompute.NetworkProfile{
 		NetworkInterfaces: []*armcompute.NetworkInterfaceReference{
-			&armcompute.NetworkInterfaceReference{
+			{
 				ID: nic.ID,
 				Properties: &armcompute.NetworkInterfaceReferenceProperties{
 					Primary: to.Ptr(true),
@@ -512,13 +512,14 @@ USINGCERT:
 		nil,
 	)
 	if err != nil {
-		fmt.Printf("\nErr creating disk: %s", err)
+		fmt.Printf("\nError creating disk: %s", err)
 		os.Exit(1)
 	}
+	cntxTimeoutManagedDisk, cancel := context.WithTimeout(cntx, 500*time.Second)
 	defer cancel()
-	_, err = diskResp.PollUntilDone(cntxTimeout, nil)
+	_, err = diskResp.PollUntilDone(cntxTimeoutManagedDisk, nil)
 	if err != nil {
-		fmt.Printf("\nError creating disk: %s\n", err)
+		fmt.Printf("\nError polling for disk creation: %s\n", err)
 	}
 	diskresult, _ := diskResp.Result(context.Background())
 	disk := diskresult.Disk
@@ -531,7 +532,7 @@ USINGCERT:
 			Version:   to.Ptr("latest"),
 		},
 		DataDisks: []*armcompute.DataDisk{
-			&armcompute.DataDisk{
+			{
 				CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesAttach),
 				ManagedDisk: &armcompute.ManagedDiskParameters{
 					StorageAccountType: to.Ptr(armcompute.StorageAccountTypesStandardLRS),
