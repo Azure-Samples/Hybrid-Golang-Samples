@@ -16,16 +16,17 @@ The code provided shows how to do the following:
 To see the code to perform these operations,
 check out the `main()` function in [app.go](app.go).
 
-
 ## Running this sample
 
-1.  Open a Powershell or Bash shell in `...\Hybrid-Golang-Samples\storage` and enter the following commands:
-    ```
+1. Open a Powershell or Bash shell in `...\Hybrid-Golang-Samples\storage` and enter the following commands:
+
+    ```powershell
     go mod tidy
     ```
 
 1. Run the sample.
-    ```
+
+    ```powershell
     go run app.go [-secret] [-clean] [-disableID]
     ```
 
