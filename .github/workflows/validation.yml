@@ -29,7 +29,7 @@ jobs:
           # Get a random AAD and ADFS environment
           $inputIdProvider = "${{ github.event.inputs.identity_provider }}" 
           $environmentJsonArray = Resolve-IdProviderToEnvironmentJSONArray -Config $config -InputIdentityProvider $inputIdProvider
-          echo "::set-output name=ENVIRONMENT_JSON_ARRAY::${environmentJsonArray}"
+          echo "ENVIRONMENT_JSON_ARRAY=${environmentJsonArray}" >> "$GITHUB_OUTPUT"
 
           # Create JSON string output of samples to run.
           $branch = ""
@@ -52,7 +52,7 @@ jobs:
           }
           $inputJsonArrayString = Resolve-SamplesInputToSamplesJsonArray -Config $config `
             -Samples $inputSamples
-          echo "::set-output name=INPUT_JSON_ARRAY::${inputJsonArrayString}"
+          echo "INPUT_JSON_ARRAY=${inputJsonArrayString}" >> "$GITHUB_OUTPUT"
 
     outputs:
       ENVIRONMENT_JSON_ARRAY: ${{ steps.prepare_ci_and_input.outputs.ENVIRONMENT_JSON_ARRAY }}
