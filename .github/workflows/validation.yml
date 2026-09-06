@@ -68,7 +68,7 @@ jobs:
         INPUT_JSON_ARRAY: ${{ fromJson(needs.Prepare_CI.outputs.INPUT_JSON_ARRAY) }}
     steps:
       - name: Log in with Azure.
-        uses: azure/login@v1
+        uses: azure/login@cb79c773a3cfa27f31f25eb3f677781210c9ce3d # v1.6.1
         with:
           creds: ${{ secrets.AZURE_SP_CREDENTIALS }}
           enable-AzPSSession: true
